@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Ensure all interactive elements show pointer cursor */
+a,
+button,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+summary,
+[onclick],
+[tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+}
+
 :root {
   --background: #09090b;
   --foreground: #fafafa;

@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   title: "AccessAI — Web Accessibility Analysis",
   description:
     "Instantly identify, understand, and fix accessibility barriers with AI-powered WCAG scanning and expert recommendations.",
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

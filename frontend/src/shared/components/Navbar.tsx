@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/shared/lib/supabase/client";
@@ -13,7 +14,6 @@ import {
   UserPlus,
   Menu,
   X,
-  Shield,
 } from "lucide-react";
 
 export default function Navbar() {
@@ -79,9 +79,13 @@ export default function Navbar() {
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-shadow">
-              <Shield className="w-4.5 h-4.5 text-white" />
-            </div>
+            <Image
+              src="/icon.svg"
+              alt="AccessAI Logo"
+              width={32}
+              height={32}
+              className="shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-shadow"
+            />
             <span className="text-lg font-semibold text-white tracking-tight">
               AccessAI
             </span>
@@ -98,9 +102,17 @@ export default function Navbar() {
 
                 <div className="w-px h-6 bg-white/10 mx-3" />
 
-                <span className="text-xs text-zinc-500 mr-2 max-w-[160px] truncate">
-                  {user.email}
-                </span>
+                <div className="relative group">
+                  <div
+                    className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold uppercase shadow-lg shadow-indigo-500/20"
+                    title={user.email || ""}
+                  >
+                    {user.email ? user.email.charAt(0) : "U"}
+                  </div>
+                  <div className="absolute top-full right-0 mt-2 px-3 py-1.5 rounded-lg bg-zinc-800 border border-white/10 text-xs text-zinc-300 whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none shadow-xl">
+                    {user.email}
+                  </div>
+                </div>
                 <button
                   onClick={handleSignOut}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
@@ -153,8 +165,11 @@ export default function Navbar() {
                     History
                   </Link>
                   <div className="h-px bg-white/[0.06] my-2" />
-                  <div className="px-3 py-2">
-                    <p className="text-xs text-zinc-500 truncate">
+                  <div className="flex items-center gap-3 px-3 py-2">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold uppercase shrink-0">
+                      {user.email ? user.email.charAt(0) : "U"}
+                    </div>
+                    <p className="text-xs text-zinc-400 truncate">
                       {user.email}
                     </p>
                   </div>

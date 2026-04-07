@@ -39,28 +39,29 @@ export default function ScoreBadge({ score, size = "md" }: ScoreBadgeProps) {
   };
 
   const colors = getColor();
-  const circumference = 2 * Math.PI * 40;
+  const radius = 40;
+  const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
 
-  const sizeConfig = {
-    sm: { wrapper: "w-11 h-11", text: "text-xs font-bold", svg: 28 },
-    md: { wrapper: "w-18 h-18", text: "text-lg font-bold", svg: 56 },
-    lg: { wrapper: "w-26 h-26", text: "text-2xl font-bold", svg: 88 },
+  const sizeStyles = {
+    sm: { px: 44, fontSize: "text-xs font-bold" },
+    md: { px: 72, fontSize: "text-lg font-bold" },
+    lg: { px: 96, fontSize: "text-2xl font-bold" },
   };
 
-  const config = sizeConfig[size];
+  const config = sizeStyles[size];
 
   if (size === "sm") {
     return (
       <div
         className={cn(
           "rounded-lg border flex items-center justify-center font-bold",
-          config.wrapper,
-          config.text,
+          "text-xs",
           colors.text,
           colors.bg,
           colors.border
         )}
+        style={{ width: config.px, height: config.px }}
       >
         {score}
       </div>
@@ -68,17 +69,20 @@ export default function ScoreBadge({ score, size = "md" }: ScoreBadgeProps) {
   }
 
   return (
-    <div className={cn("relative flex items-center justify-center", config.wrapper)}>
+    <div
+      className="relative flex items-center justify-center shrink-0"
+      style={{ width: config.px, height: config.px }}
+    >
       <svg
         className="absolute inset-0 -rotate-90"
+        width={config.px}
+        height={config.px}
         viewBox="0 0 100 100"
-        width={config.svg}
-        height={config.svg}
       >
         <circle
           cx="50"
           cy="50"
-          r="40"
+          r={radius}
           fill="none"
           stroke="currentColor"
           strokeWidth="6"
@@ -87,7 +91,7 @@ export default function ScoreBadge({ score, size = "md" }: ScoreBadgeProps) {
         <circle
           cx="50"
           cy="50"
-          r="40"
+          r={radius}
           fill="none"
           strokeWidth="6"
           strokeLinecap="round"
@@ -96,7 +100,7 @@ export default function ScoreBadge({ score, size = "md" }: ScoreBadgeProps) {
           className={cn(colors.ring, "transition-all duration-700 ease-out")}
         />
       </svg>
-      <span className={cn(config.text, colors.text)}>{score}</span>
+      <span className={cn(config.fontSize, colors.text)}>{score}</span>
     </div>
   );
 }

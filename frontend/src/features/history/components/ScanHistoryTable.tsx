@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { Scan } from "@/shared/types";
 import ScoreBadge from "@/shared/components/ScoreBadge";
@@ -9,13 +10,22 @@ import {
   ArrowRight,
   ExternalLink,
   Scan as ScanIcon,
+  ChevronLeft,
+  ChevronRight as ChevronRightIcon,
 } from "lucide-react";
+
+const ITEMS_PER_PAGE = 10;
 
 interface ScanHistoryTableProps {
   scans: Scan[];
 }
 
 export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(scans.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedScans = scans.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   if (scans.length === 0) {
     return (
       <div className="text-center py-20">
@@ -63,7 +73,7 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.04]">
-            {scans.map((scan) => (
+            {paginatedScans.map((scan) => (
               <tr
                 key={scan.id}
                 className="hover:bg-white/[0.02] transition-colors"
@@ -115,7 +125,7 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
 
       {/* Mobile Cards */}
       <div className="md:hidden divide-y divide-white/[0.04]">
-        {scans.map((scan) => (
+        {paginatedScans.map((scan) => (
           <div key={scan.id} className="p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <a
@@ -149,6 +159,57 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
           </div>
         ))}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06]">
+          <p className="text-xs text-zinc-500">
+            Showing {startIndex + 1}&ndash;{Math.min(startIndex + ITEMS_PER_PAGE, scans.length)} of {scans.length} scans
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                currentPage === 1
+                  ? "text-zinc-600 cursor-not-allowed"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+              )}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  "w-8 h-8 rounded-lg text-xs font-medium transition-colors",
+                  page === currentPage
+                    ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                    : "text-zinc-400 hover:text-white hover:bg-white/5"
+                )}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                currentPage === totalPages
+                  ? "text-zinc-600 cursor-not-allowed"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+              )}
+              aria-label="Next page"
+            >
+              <ChevronRightIcon className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
