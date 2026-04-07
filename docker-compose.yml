@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      - PORT=3001
+      - AGENT_SERVICE_URL=http://agent:8000
+    depends_on:
+      - agent
+    volumes:
+      - ./backend/src:/app/src
+
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+      - BACKEND_SERVICE_URL=http://backend:3001
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/src:/app/src
