@@ -6,6 +6,7 @@ import { severityOrder } from "@/shared/types";
 import ScoreBadge from "@/shared/components/ScoreBadge";
 import SeverityBadge from "@/shared/components/SeverityBadge";
 import { cn } from "@/shared/lib/utils";
+import MarkdownRenderer from "@/shared/components/MarkdownRenderer";
 import {
   Sparkles,
   ExternalLink,
@@ -94,9 +95,7 @@ export default function ReportView({ result }: ReportViewProps) {
             </div>
             <h3 className="text-lg font-semibold text-white">AI Summary</h3>
           </div>
-          <p className="text-zinc-300 whitespace-pre-line leading-relaxed text-sm">
-            {report.summary}
-          </p>
+          <MarkdownRenderer content={report.summary} />
           {report.priority_recommendations && (
             <div className="mt-5 pt-5 border-t border-indigo-500/10">
               <div className="flex items-center gap-2 mb-3">
@@ -105,9 +104,7 @@ export default function ReportView({ result }: ReportViewProps) {
                   Priority Recommendations
                 </h4>
               </div>
-              <p className="text-zinc-400 whitespace-pre-line text-sm leading-relaxed">
-                {report.priority_recommendations}
-              </p>
+              <MarkdownRenderer content={report.priority_recommendations} />
             </div>
           )}
         </div>
@@ -186,9 +183,7 @@ function IssueCard({ issue }: { issue: Issue }) {
       {/* Expandable content */}
       {expanded && (
         <div className="px-5 pb-5 pt-0 ml-7 space-y-4 animate-fade-in">
-          <p className="text-zinc-400 text-sm leading-relaxed">
-            {issue.description}
-          </p>
+          <MarkdownRenderer content={issue.description} />
 
           {issue.recommendation && (
             <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
@@ -198,9 +193,7 @@ function IssueCard({ issue }: { issue: Issue }) {
                   Recommended Fix
                 </h5>
               </div>
-              <p className="text-sm text-zinc-400 whitespace-pre-line leading-relaxed">
-                {issue.recommendation}
-              </p>
+              <MarkdownRenderer content={issue.recommendation} />
             </div>
           )}
 
