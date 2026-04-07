@@ -1,119 +1,294 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { createClient } from "@/shared/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
+import URLInput from "@/features/scan/components/URLInput";
+import ScanProgress from "@/features/scan/components/ScanProgress";
+import ReportView from "@/features/scan/components/ReportView";
+import { createScan } from "@/features/scan/services/scan";
+import type { ScanResult } from "@/shared/types";
+import {
+  Search,
+  Sparkles,
+  Code,
+  ArrowRight,
+  Shield,
+  Zap,
+  BarChart3,
+  CheckCircle,
+  Lock,
+  LogIn,
+  AlertCircle,
+  RefreshCw,
+  ArrowLeft,
+} from "lucide-react";
 
 export default function HomePage() {
+  const supabase = createClient();
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Scan state
+  const [scanLoading, setScanLoading] = useState(false);
+  const [result, setResult] = useState<ScanResult | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+      setAuthLoading(false);
+    };
+    getUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
+
+  const handleScan = async (url: string) => {
+    setScanLoading(true);
+    setResult(null);
+    setError("");
+    try {
+      const scanResult = await createScan(url);
+      setResult(scanResult);
+    } catch (err: any) {
+      setError(err.message || "Scan failed. Please try again.");
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setResult(null);
+    setError("");
+  };
+
+  // If we have results, show full-screen results view
+  if (result) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center mb-8">
+          <button
+            onClick={handleReset}
+            className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white font-medium transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Scan another website
+          </button>
+        </div>
+        <ReportView result={result} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)]">
-      {/* Hero Section */}
-      <section className="relative py-20 lg:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
-            Make the web
-            <span className="text-blue-600"> accessible</span>
+      {/* Hero Section with Scanner */}
+      <section className="relative py-24 lg:py-32 overflow-hidden">
+        {/* Background Effects */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden="true"
+        >
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse-glow" />
+          <div className="absolute bottom-0 left-1/4 w-[400px] h-[400px] bg-violet-500/8 rounded-full blur-[100px]" />
+          <div className="absolute top-1/3 right-1/4 w-[300px] h-[300px] bg-blue-500/5 rounded-full blur-[80px]" />
+          {/* Grid pattern */}
+          <div
+            className="absolute inset-0 opacity-[0.015]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+              backgroundSize: "60px 60px",
+            }}
+          />
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 mb-8 animate-fade-in">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="text-xs font-medium text-zinc-300">
+              AI-Powered WCAG 2.1 Analysis
+            </span>
+          </div>
+
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 animate-fade-in">
+            <span className="text-white">Make the web</span>
             <br />
-            for everyone
+            <span className="gradient-text">accessible for everyone</span>
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-10">
-            AccessAI helps web developers instantly identify, understand, and
-            fix accessibility barriers by combining automated WCAG scanning
-            with AI-powered expert recommendations.
+
+          <p className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto mb-12 animate-fade-in leading-relaxed">
+            Instantly identify, understand, and fix accessibility barriers with
+            automated WCAG scanning and AI-powered expert recommendations.
           </p>
-          <div className="flex gap-4 justify-center">
-            <Link
-              href="/scan"
-              className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium text-lg transition-colors"
-            >
-              Start Scanning
-            </Link>
-            <Link
-              href="/signup"
-              className="px-8 py-3 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-medium text-lg transition-colors border border-gray-300"
-            >
-              Create Account
-            </Link>
+
+          {/* Auth-aware Scanner Area */}
+          {!authLoading && (
+            <div className="animate-fade-in">
+              {user ? (
+                /* Logged-in: Show scanner */
+                <div className="max-w-2xl mx-auto">
+                  {!scanLoading && !error && (
+                    <URLInput onSubmit={handleScan} loading={scanLoading} />
+                  )}
+
+                  {scanLoading && <ScanProgress />}
+
+                  {error && (
+                    <div className="text-center">
+                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 mb-5">
+                        <AlertCircle className="w-7 h-7 text-red-400" />
+                      </div>
+                      <h2 className="text-xl font-bold text-white mb-2">
+                        Scan Failed
+                      </h2>
+                      <p className="text-zinc-400 text-sm max-w-md mx-auto mb-6">
+                        {error}
+                      </p>
+                      <button
+                        onClick={handleReset}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-zinc-300 hover:text-white hover:bg-white/10 font-medium transition-all"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Try again
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Not logged-in: Show login prompt */
+                <div className="max-w-md mx-auto">
+                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8 backdrop-blur-sm">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 mb-4">
+                      <Lock className="w-6 h-6 text-indigo-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">
+                      Sign in to start scanning
+                    </h3>
+                    <p className="text-sm text-zinc-400 mb-6">
+                      Log in to your account to scan websites for accessibility
+                      issues and get AI-powered recommendations.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <Link
+                        href="/login"
+                        className="group inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl font-medium text-sm transition-all duration-300 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:from-indigo-400 hover:to-violet-500"
+                      >
+                        <LogIn className="w-4 h-4" />
+                        Log In
+                      </Link>
+                      <Link
+                        href="/signup"
+                        className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-medium text-sm text-zinc-300 border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition-all duration-200"
+                      >
+                        Create Account
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="py-16 border-y border-white/[0.06]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {[
+              { value: "WCAG 2.1", label: "Full Compliance", icon: Shield },
+              {
+                value: "AI-Powered",
+                label: "Issue Analysis",
+                icon: Sparkles,
+              },
+              { value: "Real-time", label: "Scan Results", icon: Zap },
+              {
+                value: "Detailed",
+                label: "Fix Suggestions",
+                icon: BarChart3,
+              },
+            ].map((stat) => (
+              <div key={stat.label} className="text-center group">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-white/5 border border-white/10 mb-3 group-hover:border-indigo-500/30 transition-colors">
+                  <stat.icon className="w-5 h-5 text-indigo-400" />
+                </div>
+                <p className="text-lg font-semibold text-white">{stat.value}</p>
+                <p className="text-sm text-zinc-500">{stat.label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-20 bg-white">
+      {/* How It Works Section */}
+      <section className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
-            How it works
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="text-center p-6">
-              <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-7 h-7 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              How it works
+            </h2>
+            <p className="text-zinc-400 max-w-lg mx-auto">
+              Three simple steps to a fully accessible website
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
+            {/* Step 1 */}
+            <div className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 hover:bg-white/[0.04] hover:border-white/10 transition-all duration-300">
+              <div className="absolute top-8 right-8 text-5xl font-bold text-white/[0.03] select-none">
+                01
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                1. Scan
-              </h3>
-              <p className="text-gray-600">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/20 flex items-center justify-center mb-5">
+                <Search className="w-6 h-6 text-blue-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-3">Scan</h3>
+              <p className="text-zinc-400 leading-relaxed">
                 Enter any website URL. Our engine loads the page in a real
                 browser and runs comprehensive WCAG 2.1 accessibility checks.
               </p>
             </div>
 
-            {/* Feature 2 */}
-            <div className="text-center p-6">
-              <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-7 h-7 text-purple-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                  />
-                </svg>
+            {/* Step 2 */}
+            <div className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 hover:bg-white/[0.04] hover:border-white/10 transition-all duration-300">
+              <div className="absolute top-8 right-8 text-5xl font-bold text-white/[0.03] select-none">
+                02
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                2. Analyze
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-600/10 border border-violet-500/20 flex items-center justify-center mb-5">
+                <Sparkles className="w-6 h-6 text-violet-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-3">
+                Analyze
               </h3>
-              <p className="text-gray-600">
+              <p className="text-zinc-400 leading-relaxed">
                 Our AI agent classifies each issue by severity, explains its
                 impact on users with disabilities, and references WCAG criteria.
               </p>
             </div>
 
-            {/* Feature 3 */}
-            <div className="text-center p-6">
-              <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-7 h-7 text-green-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                  />
-                </svg>
+            {/* Step 3 */}
+            <div className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 hover:bg-white/[0.04] hover:border-white/10 transition-all duration-300">
+              <div className="absolute top-8 right-8 text-5xl font-bold text-white/[0.03] select-none">
+                03
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                3. Fix
-              </h3>
-              <p className="text-gray-600">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/20 flex items-center justify-center mb-5">
+                <Code className="w-6 h-6 text-emerald-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-3">Fix</h3>
+              <p className="text-zinc-400 leading-relaxed">
                 Get specific, actionable code-level fix suggestions for every
                 issue — ready to copy and implement immediately.
               </p>
@@ -122,24 +297,45 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20">
-        <div className="max-w-3xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Ready to improve your website&apos;s accessibility?
-          </h2>
-          <p className="text-lg text-gray-600 mb-8">
-            Over 96% of websites have accessibility issues. Let AccessAI help
-            you find and fix them.
+      {/* CTA Section — only for non-logged-in users */}
+      {!authLoading && !user && (
+        <section className="py-24">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6">
+            <div className="relative rounded-2xl border border-white/[0.06] bg-gradient-to-br from-indigo-500/[0.08] to-violet-500/[0.04] p-12 text-center overflow-hidden">
+              <div
+                className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[200px] bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none"
+                aria-hidden="true"
+              />
+              <div className="relative">
+                <CheckCircle className="w-10 h-10 text-indigo-400 mx-auto mb-6" />
+                <h2 className="text-3xl font-bold text-white mb-4">
+                  Ready to improve your site&apos;s accessibility?
+                </h2>
+                <p className="text-zinc-400 mb-8 max-w-lg mx-auto">
+                  Over 96% of websites have accessibility issues. Let AccessAI
+                  help you find and fix them with AI-powered analysis.
+                </p>
+                <Link
+                  href="/login"
+                  className="group inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl font-medium transition-all duration-300 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:from-indigo-400 hover:to-violet-500"
+                >
+                  Get Started Free
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Footer */}
+      <footer className="border-t border-white/[0.06] py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="text-sm text-zinc-600">
+            Built with accessibility in mind.
           </p>
-          <Link
-            href="/signup"
-            className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium text-lg transition-colors"
-          >
-            Get Started Free
-          </Link>
         </div>
-      </section>
+      </footer>
     </div>
   );
 }

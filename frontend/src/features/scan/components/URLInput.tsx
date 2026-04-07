@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Globe, ArrowRight, AlertCircle } from "lucide-react";
 
 interface URLInputProps {
   onSubmit: (url: string) => void;
@@ -33,29 +34,51 @@ export default function URLInput({ onSubmit, loading }: URLInputProps) {
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
       <div className="flex flex-col gap-3">
-        <label htmlFor="url" className="text-sm font-medium text-gray-700">
+        <label htmlFor="url" className="sr-only">
           Website URL
         </label>
-        <div className="flex gap-3">
-          <input
-            id="url"
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://example.com"
-            required
-            disabled={loading}
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-lg disabled:bg-gray-50 disabled:cursor-not-allowed"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            {loading ? "Scanning..." : "Scan"}
-          </button>
+
+        <div className="relative">
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+              <input
+                id="url"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com"
+                required
+                disabled={loading}
+                className="w-full pl-12 pr-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-500 text-base focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="group flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl font-medium transition-all duration-300 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:from-indigo-400 hover:to-violet-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-indigo-500/20 whitespace-nowrap"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  Scan
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                </>
+              )}
+            </button>
+          </div>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        {error && (
+          <div className="flex items-center gap-2 text-sm text-red-400">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
       </div>
     </form>
   );

@@ -44,23 +44,28 @@ async function getBrowser(): Promise<Browser> {
 
 export async function runAxeScan(url: string): Promise<ScanResult> {
   const browserInstance = await getBrowser();
+  let context: import("playwright").BrowserContext | null = null;
   let page: Page | null = null;
 
   try {
-    page = await browserInstance.newPage();
+    // axe-core/playwright requires pages from browser.newContext()
+    context = await browserInstance.newContext({
+      viewport: { width: 1280, height: 720 },
+    });
+    page = await context.newPage();
 
-    // Set a reasonable timeout and viewport
-    page.setDefaultTimeout(20000);
-    await page.setViewportSize({ width: 1280, height: 720 });
+    // Set a reasonable timeout
+    page.setDefaultTimeout(45000);
 
     logger.info(`Navigating to ${url}...`);
+    // Use domcontentloaded first (fast), then wait for extra load time
     await page.goto(url, {
-      waitUntil: "networkidle",
-      timeout: 20000,
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
     });
 
-    // Wait a bit for any late-loading JS
-    await page.waitForTimeout(1000);
+    // Give JS-heavy pages a bit more time to render
+    await page.waitForTimeout(3000);
 
     logger.info("Running axe-core accessibility scan...");
     const results = await new AxeBuilder({ page })
@@ -94,8 +99,8 @@ export async function runAxeScan(url: string): Promise<ScanResult> {
     logger.error(`Scan failed for ${url}:`, error);
     throw error;
   } finally {
-    if (page) {
-      await page.close().catch(() => {});
+    if (context) {
+      await context.close().catch(() => {});
     }
   }
 }

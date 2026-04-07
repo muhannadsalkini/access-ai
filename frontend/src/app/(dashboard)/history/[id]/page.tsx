@@ -6,6 +6,7 @@ import Link from "next/link";
 import ReportView from "@/features/scan/components/ReportView";
 import { getScanDetail } from "@/features/history/services/history";
 import type { ScanResult } from "@/shared/types";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function ScanDetailPage() {
   const params = useParams();
@@ -36,22 +37,24 @@ export default function ScanDetailPage() {
       <div className="mb-8">
         <Link
           href="/history"
-          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+          className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white font-medium transition-colors"
         >
-          ← Back to History
+          <ArrowLeft className="w-4 h-4" />
+          Back to History
         </Link>
       </div>
 
       {loading && (
-        <div className="text-center py-16">
-          <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto" />
-          <p className="text-gray-500 mt-4">Loading report...</p>
+        <div className="text-center py-20">
+          <div className="w-10 h-10 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto" />
+          <p className="text-zinc-500 mt-4 text-sm">Loading report...</p>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200">
-          {error}
+        <div className="flex items-start gap-3 bg-red-500/10 text-red-400 p-4 rounded-xl border border-red-500/20">
+          <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 

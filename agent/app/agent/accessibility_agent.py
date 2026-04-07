@@ -61,7 +61,7 @@ async def analyze_accessibility(request: AnalyzeRequest) -> AnalyzeResponse:
 
     # Call Gemini
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
