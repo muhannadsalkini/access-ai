@@ -2,13 +2,17 @@
 
 import json
 import os
+import asyncio
+import queue
+import threading
+from typing import AsyncGenerator
 from google import genai
 from google.genai import types
 
 from app.config import get_settings
-from app.agent.prompts import SYSTEM_INSTRUCTION, ANALYSIS_PROMPT_TEMPLATE
-from app.schemas.requests import AnalyzeRequest
-from app.schemas.responses import AnalyzeResponse, AnalyzedIssue
+from app.agent.prompts import SYSTEM_INSTRUCTION, ANALYSIS_PROMPT_TEMPLATE, CHAT_SYSTEM_INSTRUCTION, CHAT_PROMPT_TEMPLATE
+from app.schemas.requests import AnalyzeRequest, ChatRequest
+from app.schemas.responses import AnalyzeResponse, AnalyzedIssue, ChatResponse
 
 
 def _format_violations(violations) -> str:
@@ -120,3 +124,118 @@ async def analyze_accessibility(request: AnalyzeRequest) -> AnalyzeResponse:
         issues=issues,
         accessibility_score=max(0, min(100, result.get("accessibility_score", 50))),
     )
+
+
+async def chat_about_scan(request: ChatRequest) -> ChatResponse:
+    """
+    Chat with the AI agent about scan results.
+
+    Uses Google Gemini with conversation history and scan context
+    to provide helpful follow-up answers about accessibility fixes.
+    """
+    settings = get_settings()
+    client = genai.Client(api_key=settings.google_api_key)
+
+    # Format conversation history
+    history_text = ""
+    if request.conversation_history:
+        history_parts = []
+        for msg in request.conversation_history:
+            role_label = "User" if msg.role == "user" else "Assistant"
+            history_parts.append(f"{role_label}: {msg.content}")
+        history_text = "\n\n".join(history_parts)
+    else:
+        history_text = "(No previous conversation)"
+
+    # Build the chat prompt
+    prompt = CHAT_PROMPT_TEMPLATE.format(
+        url=request.url,
+        score=request.score,
+        summary=request.summary,
+        issues_text=request.issues_text,
+        conversation_history=history_text,
+        user_message=request.message,
+    )
+
+    # Call Gemini
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=CHAT_SYSTEM_INSTRUCTION,
+            temperature=0.3,
+        ),
+    )
+
+    return ChatResponse(response=response.text or "I could not generate a response. Please try again.")
+
+
+async def chat_about_scan_stream(request: ChatRequest) -> AsyncGenerator[str, None]:
+    """
+    Stream chat response tokens from Gemini as an async generator.
+
+    Uses a background thread to run the synchronous Gemini streaming API
+    so it doesn't block the async event loop, allowing FastAPI to flush
+    SSE events to the client in real-time.
+    """
+    settings = get_settings()
+    client = genai.Client(api_key=settings.google_api_key)
+
+    # Format conversation history
+    history_text = ""
+    if request.conversation_history:
+        history_parts = []
+        for msg in request.conversation_history:
+            role_label = "User" if msg.role == "user" else "Assistant"
+            history_parts.append(f"{role_label}: {msg.content}")
+        history_text = "\n\n".join(history_parts)
+    else:
+        history_text = "(No previous conversation)"
+
+    # Build the chat prompt
+    prompt = CHAT_PROMPT_TEMPLATE.format(
+        url=request.url,
+        score=request.score,
+        summary=request.summary,
+        issues_text=request.issues_text,
+        conversation_history=history_text,
+        user_message=request.message,
+    )
+
+    # Use a thread-safe queue to bridge sync Gemini streaming → async generator
+    chunk_queue: queue.Queue = queue.Queue()
+    _SENTINEL = object()
+
+    def _run_sync_stream():
+        """Run the synchronous Gemini streaming in a background thread."""
+        try:
+            response = client.models.generate_content_stream(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=CHAT_SYSTEM_INSTRUCTION,
+                    temperature=0.3,
+                ),
+            )
+            for chunk in response:
+                if chunk.text:
+                    chunk_queue.put(chunk.text)
+        except Exception as e:
+            chunk_queue.put(e)
+        finally:
+            chunk_queue.put(_SENTINEL)
+
+    # Start the sync streaming in a background thread
+    thread = threading.Thread(target=_run_sync_stream, daemon=True)
+    thread.start()
+
+    # Yield chunks from the queue as they arrive
+    loop = asyncio.get_event_loop()
+    while True:
+        # Non-blocking get from queue using executor
+        item = await loop.run_in_executor(None, chunk_queue.get)
+        if item is _SENTINEL:
+            break
+        if isinstance(item, Exception):
+            raise item
+        yield item

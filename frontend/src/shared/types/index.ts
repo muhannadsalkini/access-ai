@@ -33,6 +33,14 @@ export interface ScanResult {
   report: Report | null;
 }
 
+export interface ChatMessage {
+  id: string;
+  scan_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
 // === API Response Types ===
 
 export interface ApiResponse<T> {

@@ -25,3 +25,19 @@ class AnalyzeRequest(BaseModel):
     url: str
     scan_id: str
     violations: list[AxeViolation]
+
+
+class ChatMessage(BaseModel):
+    """A single chat message in a conversation."""
+    role: str  # "user" or "assistant"
+    content: str
+
+
+class ChatRequest(BaseModel):
+    """Request body for the /agent/chat endpoint."""
+    url: str
+    score: int
+    summary: str
+    issues_text: str
+    message: str
+    conversation_history: list[ChatMessage] = []

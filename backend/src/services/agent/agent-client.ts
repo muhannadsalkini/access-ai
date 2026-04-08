@@ -69,3 +69,52 @@ export async function callAgent(
     throw error;
   }
 }
+
+export interface AgentChatRequest {
+  url: string;
+  score: number;
+  summary: string;
+  issuesText: string;
+  message: string;
+  conversationHistory: { role: string; content: string }[];
+}
+
+export interface AgentChatResponse {
+  response: string;
+}
+
+export async function callAgentChat(
+  request: AgentChatRequest
+): Promise<AgentChatResponse> {
+  const agentUrl = `${env.agentServiceUrl}/agent/chat`;
+
+  logger.info(`Calling AI agent chat at ${agentUrl}...`);
+
+  try {
+    const response = await fetch(agentUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: request.url,
+        score: request.score,
+        summary: request.summary,
+        issues_text: request.issuesText,
+        message: request.message,
+        conversation_history: request.conversationHistory,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      logger.error(`Agent chat returned ${response.status}: ${errorBody}`);
+      throw new Error(`Agent chat service returned ${response.status}`);
+    }
+
+    const data = (await response.json()) as any;
+    return { response: data.response || "" };
+  } catch (error) {
+    logger.error("Failed to call agent chat service:", error);
+    throw error;
+  }
+}

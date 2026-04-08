@@ -7,6 +7,7 @@ import ScoreBadge from "@/shared/components/ScoreBadge";
 import SeverityBadge from "@/shared/components/SeverityBadge";
 import { cn } from "@/shared/lib/utils";
 import MarkdownRenderer from "@/shared/components/MarkdownRenderer";
+import ChatPanel from "@/features/chat/components/ChatPanel";
 import {
   Sparkles,
   ExternalLink,
@@ -150,6 +151,9 @@ export default function ReportView({ result }: ReportViewProps) {
           )}
         </div>
       </div>
+
+      {/* Chat Panel */}
+      <ChatPanel scanId={scan.id} />
     </div>
   );
 }

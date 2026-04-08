@@ -16,3 +16,8 @@ class AnalyzeResponse(BaseModel):
     priority_recommendations: str
     issues: list[AnalyzedIssue]
     accessibility_score: int  # 0-100
+
+
+class ChatResponse(BaseModel):
+    """Response body from the /agent/chat endpoint."""
+    response: str
