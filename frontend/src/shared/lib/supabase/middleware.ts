@@ -34,7 +34,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Protected routes - redirect to login if not authenticated
-  const protectedPaths = ["/scan", "/history"];
+  const protectedPaths = ["/", "/history"];
   const isProtected = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );
@@ -47,14 +47,15 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Redirect authenticated users away from auth pages
-  const authPaths = ["/login", "/signup"];
+  // Note: /reset-password is excluded — it requires an active recovery session
+  const authPaths = ["/login", "/signup", "/forgot-password"];
   const isAuthPage = authPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );
 
   if (isAuthPage && user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/scan";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 

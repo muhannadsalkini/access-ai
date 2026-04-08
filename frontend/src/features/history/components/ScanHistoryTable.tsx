@@ -39,7 +39,7 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
           Start by scanning a website for accessibility issues.
         </p>
         <Link
-          href="/scan"
+          href="/"
           className="group inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl font-medium text-sm transition-all duration-300 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40"
         >
           <ScanIcon className="w-4 h-4" />

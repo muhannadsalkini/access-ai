@@ -20,7 +20,7 @@ export default function LoginForm() {
 
     try {
       await signIn(email, password);
-      router.push("/scan");
+      router.push("/");
       router.refresh();
     } catch (err: any) {
       setError(err.message || "Failed to sign in");
@@ -73,12 +73,20 @@ export default function LoginForm() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-zinc-300 mb-2"
-            >
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-zinc-300"
+              >
+                Password
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
