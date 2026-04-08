@@ -2,6 +2,56 @@ import { env } from "../../config/env";
 import { logger } from "../../utils/logger";
 import { AxeViolation } from "../accessibility/axe-scanner";
 
+// ---------------------------------------------------------------------------
+// Retry helper — handles agent cold-start on Render free tier
+// 3 retries with delays: 15s, 20s, 25s → max ~60s total wait time
+// ---------------------------------------------------------------------------
+
+const AGENT_RETRY_DELAYS_MS = [15_000, 20_000, 25_000];
+
+function isTransientAgentError(status?: number, err?: any): boolean {
+  if (status && [502, 503, 504].includes(status)) return true;
+  // Network-level errors (ECONNREFUSED, ETIMEDOUT, etc.)
+  if (err && (err.code === "ECONNREFUSED" || err.code === "ECONNRESET")) return true;
+  if (err instanceof TypeError && err.message.toLowerCase().includes("fetch")) return true;
+  return false;
+}
+
+async function withAgentRetry<T>(
+  label: string,
+  fn: () => Promise<{ status?: number; result: T }>
+): Promise<T> {
+  let lastError: any;
+
+  for (let attempt = 0; attempt <= AGENT_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const { result } = await fn();
+      return result;
+    } catch (err: any) {
+      lastError = err;
+
+      // If no more retries left, throw immediately
+      if (attempt === AGENT_RETRY_DELAYS_MS.length) break;
+
+      // Only retry on transient/service-unavailable errors
+      if (!isTransientAgentError(err.status, err)) throw err;
+
+      const delay = AGENT_RETRY_DELAYS_MS[attempt];
+      logger.warn(
+        `[${label}] Agent unavailable (attempt ${attempt + 1}/${AGENT_RETRY_DELAYS_MS.length}). ` +
+          `Retrying in ${delay / 1000}s — server may be waking up...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 export interface AgentRequest {
   url: string;
   scanId: string;
@@ -23,36 +73,35 @@ export interface AgentResponse {
   accessibilityScore: number;
 }
 
-export async function callAgent(
-  request: AgentRequest
-): Promise<AgentResponse> {
+export async function callAgent(request: AgentRequest): Promise<AgentResponse> {
   const agentUrl = `${env.agentServiceUrl}/agent/analyze`;
 
   logger.info(`Calling AI agent at ${agentUrl} for scan ${request.scanId}...`);
 
-  try {
+  return withAgentRetry("callAgent", async () => {
     const response = await fetch(agentUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url: request.url,
         scan_id: request.scanId,
         violations: request.violations,
       }),
-      signal: AbortSignal.timeout(60000), // 60 second timeout
+      // Generous timeout — 90s gives cold-start + Gemini processing time
+      signal: AbortSignal.timeout(90_000),
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
+      const errorBody = await response.text().catch(() => "");
       logger.error(`Agent returned ${response.status}: ${errorBody}`);
-      throw new Error(`Agent service returned ${response.status}`);
+      const err: any = new Error(`Agent service returned ${response.status}`);
+      err.status = response.status;
+      throw err;
     }
 
     const data = (await response.json()) as any;
 
-    return {
+    const result: AgentResponse = {
       summary: data.summary || "",
       priorityRecommendations: data.priority_recommendations || "",
       issues: (data.issues || []).map((issue: any) => ({
@@ -64,11 +113,12 @@ export async function callAgent(
       })),
       accessibilityScore: data.accessibility_score || 0,
     };
-  } catch (error) {
-    logger.error("Failed to call agent service:", error);
-    throw error;
-  }
+
+    return { status: response.status, result };
+  });
 }
+
+// ---------------------------------------------------------------------------
 
 export interface AgentChatRequest {
   url: string;
@@ -90,7 +140,7 @@ export async function callAgentChat(
 
   logger.info(`Calling AI agent chat at ${agentUrl}...`);
 
-  try {
+  return withAgentRetry("callAgentChat", async () => {
     const response = await fetch(agentUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -102,19 +152,18 @@ export async function callAgentChat(
         message: request.message,
         conversation_history: request.conversationHistory,
       }),
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(90_000),
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
+      const errorBody = await response.text().catch(() => "");
       logger.error(`Agent chat returned ${response.status}: ${errorBody}`);
-      throw new Error(`Agent chat service returned ${response.status}`);
+      const err: any = new Error(`Agent chat service returned ${response.status}`);
+      err.status = response.status;
+      throw err;
     }
 
     const data = (await response.json()) as any;
-    return { response: data.response || "" };
-  } catch (error) {
-    logger.error("Failed to call agent chat service:", error);
-    throw error;
-  }
+    return { status: response.status, result: { response: data.response || "" } };
+  });
 }

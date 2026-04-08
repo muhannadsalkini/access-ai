@@ -23,6 +23,7 @@ import {
   AlertCircle,
   RefreshCw,
   ArrowLeft,
+  ServerCrash,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -32,6 +33,7 @@ export default function HomePage() {
 
   // Scan state
   const [scanLoading, setScanLoading] = useState(false);
+  const [wakingUp, setWakingUp] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState("");
 
@@ -56,15 +58,17 @@ export default function HomePage() {
 
   const handleScan = async (url: string) => {
     setScanLoading(true);
+    setWakingUp(false);
     setResult(null);
     setError("");
     try {
-      const scanResult = await createScan(url);
+      const scanResult = await createScan(url, () => setWakingUp(true));
       setResult(scanResult);
     } catch (err: any) {
       setError(err.message || "Scan failed. Please try again.");
     } finally {
       setScanLoading(false);
+      setWakingUp(false);
     }
   };
 
@@ -144,7 +148,39 @@ export default function HomePage() {
                     <URLInput onSubmit={handleScan} loading={scanLoading} />
                   )}
 
-                  {scanLoading && <ScanProgress />}
+                  {scanLoading && !wakingUp && <ScanProgress />}
+
+                  {scanLoading && wakingUp && (
+                    <div className="flex flex-col items-center gap-4 py-10 text-center animate-fade-in">
+                      <div className="relative">
+                        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                          <ServerCrash className="w-7 h-7 text-amber-400" />
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-500/30 border border-amber-500/50 flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-amber-300 mb-1">
+                          Waking up servers...
+                        </p>
+                        <p className="text-xs text-zinc-500 max-w-xs">
+                          The service is starting up after being idle. This
+                          takes up to 60 seconds — your scan will continue
+                          automatically.
+                        </p>
+                      </div>
+                      <div className="flex gap-1.5 mt-1">
+                        {[0, 1, 2].map((i) => (
+                          <div
+                            key={i}
+                            className="w-1.5 h-1.5 rounded-full bg-amber-500/60 animate-bounce"
+                            style={{ animationDelay: `${i * 150}ms` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {error && (
                     <div className="text-center">

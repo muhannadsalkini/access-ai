@@ -52,10 +52,60 @@ export async function sendChatMessage(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Retry helper for streaming requests — handles backend cold-start
+// ---------------------------------------------------------------------------
+
+const STREAM_RETRY_DELAYS_MS = [15_000, 15_000, 15_000, 15_000];
+
+function isTransientStreamStatus(status: number): boolean {
+  return [502, 503, 504].includes(status);
+}
+
+async function fetchStreamWithRetry(
+  url: string,
+  init: RequestInit,
+  onRetry?: (attempt: number, maxRetries: number) => void
+): Promise<Response> {
+  const maxAttempts = STREAM_RETRY_DELAYS_MS.length + 1;
+  let lastError: any;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch(url, init);
+
+      if (isTransientStreamStatus(response.status) && attempt < maxAttempts) {
+        const delayMs = STREAM_RETRY_DELAYS_MS[attempt - 1] ?? 15_000;
+        onRetry?.(attempt, STREAM_RETRY_DELAYS_MS.length);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      const isNetworkError =
+        err instanceof TypeError && err.message.toLowerCase().includes("fetch");
+
+      if (isNetworkError && attempt < maxAttempts) {
+        const delayMs = STREAM_RETRY_DELAYS_MS[attempt - 1] ?? 15_000;
+        onRetry?.(attempt, STREAM_RETRY_DELAYS_MS.length);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      throw err;
+    }
+  }
+
+  throw lastError ?? new Error("Stream request failed after all retries");
+}
+
 /**
  * Stream a chat message response via SSE.
  * Calls onUserMessage when the saved user message arrives,
  * onChunk for each text chunk, and onDone when complete.
+ * Calls onRetry when retrying due to server cold-start (502/503/504).
  */
 export async function streamChatMessage(
   scanId: string,
@@ -65,19 +115,24 @@ export async function streamChatMessage(
     onChunk: (text: string) => void;
     onDone: (savedMsg: ChatMessage | null) => void;
     onError: (error: string) => void;
+    onRetry?: (attempt: number, maxRetries: number) => void;
   }
 ): Promise<void> {
   const token = await getToken();
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-  const response = await fetch(`${baseUrl}/api/scans/${scanId}/chat/stream`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+  const response = await fetchStreamWithRetry(
+    `${baseUrl}/api/scans/${scanId}/chat/stream`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ message }),
     },
-    body: JSON.stringify({ message }),
-  });
+    callbacks.onRetry
+  );
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));

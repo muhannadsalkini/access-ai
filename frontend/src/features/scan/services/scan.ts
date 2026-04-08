@@ -2,7 +2,10 @@ import { api } from "@/shared/lib/api";
 import { getAccessToken } from "@/features/auth/services/auth";
 import type { ApiResponse, ScanResult } from "@/shared/types";
 
-export async function createScan(url: string): Promise<ScanResult> {
+export async function createScan(
+  url: string,
+  onRetry?: (attempt: number, maxRetries: number) => void
+): Promise<ScanResult> {
   const token = await getAccessToken();
   if (!token) throw new Error("Not authenticated");
 
@@ -10,6 +13,7 @@ export async function createScan(url: string): Promise<ScanResult> {
     method: "POST",
     body: { url },
     token,
+    onRetry,
   });
 
   return response.data;

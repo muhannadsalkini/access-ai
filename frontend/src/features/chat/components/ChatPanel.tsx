@@ -34,6 +34,8 @@ export default function ChatPanel({ scanId }: ChatPanelProps) {
   const [clearing, setClearing] = useState(false);
   // Streaming state: the content being built up chunk by chunk
   const [streamingContent, setStreamingContent] = useState("");
+  // Cold-start state: set to true when retrying due to 503/network error
+  const [wakingUp, setWakingUp] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -68,6 +70,7 @@ export default function ChatPanel({ scanId }: ChatPanelProps) {
 
     setError("");
     setSending(true);
+    setWakingUp(false);
     setInput("");
     setStreamingContent("");
 
@@ -83,6 +86,7 @@ export default function ChatPanel({ scanId }: ChatPanelProps) {
 
     try {
       await streamChatMessage(scanId, trimmed, {
+        onRetry: () => setWakingUp(true),
         onUserMessage: (savedUserMsg) => {
           // Replace optimistic user message with the real saved one
           setMessages((prev) =>
@@ -96,6 +100,7 @@ export default function ChatPanel({ scanId }: ChatPanelProps) {
         onDone: (savedAssistantMsg) => {
           // Replace streaming bubble with the final saved message
           setStreamingContent("");
+          setWakingUp(false);
           if (savedAssistantMsg) {
             setMessages((prev) => [...prev, savedAssistantMsg]);
           }
@@ -105,11 +110,13 @@ export default function ChatPanel({ scanId }: ChatPanelProps) {
         onError: (errMsg) => {
           setError(errMsg);
           setStreamingContent("");
+          setWakingUp(false);
           setSending(false);
         },
       });
 
       // If stream ended without a "saved" event (edge case), still clean up
+      setWakingUp(false);
       setSending(false);
     } catch (err: any) {
       setError(err.message || "Failed to send message");
@@ -118,6 +125,7 @@ export default function ChatPanel({ scanId }: ChatPanelProps) {
         prev.filter((m) => m.id !== optimisticUserMsg.id)
       );
       setStreamingContent("");
+      setWakingUp(false);
       setInput(trimmed); // Restore input
       setSending(false);
       inputRef.current?.focus();
@@ -286,6 +294,17 @@ export default function ChatPanel({ scanId }: ChatPanelProps) {
                 <div className="max-w-[80%] bg-white/[0.04] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-zinc-300">
                   {streamingContent ? (
                     <MarkdownRenderer content={streamingContent} />
+                  ) : wakingUp ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-amber-400">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span className="text-xs font-medium">Waking up servers...</span>
+                      </div>
+                      <p className="text-xs text-zinc-600 leading-relaxed">
+                        Service is starting up after being idle. This takes up
+                        to 60 seconds — please wait.
+                      </p>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2 text-zinc-500">
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
