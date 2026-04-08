@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
 import { supabaseAdmin } from "../../services/supabase/client";
 import { validateUrl } from "../../services/accessibility/url-validator";
-import { runAxeScan } from "../../services/accessibility/axe-scanner";
+import { runAxeScan, AxeViolation } from "../../services/accessibility/axe-scanner";
+import { isSitemapUrl, parseSitemap } from "../../services/accessibility/sitemap-parser";
 import { callAgent } from "../../services/agent/agent-client";
 import { AppError } from "../../middleware/error-handler";
 import { logger } from "../../utils/logger";
@@ -19,7 +20,10 @@ export async function createScan(
   // 1. Validate and sanitize URL
   const validatedUrl = await validateUrl(url);
 
-  // 2. Create scan record in database
+  // 2. Detect if URL is a sitemap
+  const scanType = isSitemapUrl(validatedUrl) ? "sitemap" : "url";
+
+  // 3. Create scan record in database
   const scanId = uuidv4();
   const scanRecord: ScanRecord = {
     id: scanId,
@@ -28,6 +32,7 @@ export async function createScan(
     scan_date: new Date().toISOString(),
     accessibility_score: 0,
     status: "scanning",
+    scan_type: scanType,
   };
 
   const { error: insertError } = await supabaseAdmin
@@ -40,20 +45,55 @@ export async function createScan(
   }
 
   try {
-    // 3. Run axe-core accessibility scan
-    logger.info(`Starting axe scan for ${validatedUrl} (scan: ${scanId})`);
-    await updateScanStatus(scanId, "scanning");
-    const scanResult = await runAxeScan(validatedUrl);
+    let allViolations: AxeViolation[] = [];
 
-    // 4. Send violations to AI agent for analysis
+    if (scanType === "sitemap") {
+      // --- SITEMAP SCAN ---
+      logger.info(`Sitemap scan detected for ${validatedUrl} (scan: ${scanId})`);
+      await updateScanStatus(scanId, "scanning");
+
+      // Parse sitemap to get page URLs
+      const pageUrls = await parseSitemap(validatedUrl);
+      logger.info(`Scanning ${pageUrls.length} pages from sitemap...`);
+
+      // Scan each page and collect all violations
+      for (let i = 0; i < pageUrls.length; i++) {
+        const pageUrl = pageUrls[i];
+        logger.info(`Scanning page ${i + 1}/${pageUrls.length}: ${pageUrl}`);
+        try {
+          const pageScan = await runAxeScan(pageUrl);
+          // Tag each violation with the source page URL for context
+          const taggedViolations = pageScan.violations.map((v) => ({
+            ...v,
+            description: `[${pageUrl}] ${v.description}`,
+          }));
+          allViolations = allViolations.concat(taggedViolations);
+        } catch (pageError) {
+          logger.warn(`Failed to scan page ${pageUrl}: ${pageError}. Skipping.`);
+          // Continue scanning other pages even if one fails
+        }
+      }
+
+      logger.info(
+        `Collected ${allViolations.length} total violations from ${pageUrls.length} pages`
+      );
+    } else {
+      // --- SINGLE URL SCAN ---
+      logger.info(`Starting axe scan for ${validatedUrl} (scan: ${scanId})`);
+      await updateScanStatus(scanId, "scanning");
+      const scanResult = await runAxeScan(validatedUrl);
+      allViolations = scanResult.violations;
+    }
+
+    // 4. Send all violations to AI agent for analysis
     logger.info(
-      `Found ${scanResult.violationCount} violations. Sending to AI agent...`
+      `Found ${allViolations.length} violations. Sending to AI agent...`
     );
     await updateScanStatus(scanId, "analyzing");
     const agentResponse = await callAgent({
       url: validatedUrl,
       scanId,
-      violations: scanResult.violations,
+      violations: allViolations,
     });
 
     // 5. Store issues in database

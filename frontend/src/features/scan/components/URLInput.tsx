@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Globe, ArrowRight, AlertCircle } from "lucide-react";
+import { Globe, ArrowRight, AlertCircle, FileText } from "lucide-react";
 
 interface URLInputProps {
   onSubmit: (url: string) => void;
@@ -11,6 +11,15 @@ interface URLInputProps {
 export default function URLInput({ onSubmit, loading }: URLInputProps) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
+
+  const isSitemap = (() => {
+    try {
+      const parsed = new URL(url);
+      return parsed.pathname.toLowerCase().endsWith(".xml");
+    } catch {
+      return false;
+    }
+  })();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,11 +82,26 @@ export default function URLInput({ onSubmit, loading }: URLInputProps) {
           </div>
         </div>
 
+        {isSitemap && !error && (
+          <div className="flex items-center gap-2 text-sm text-indigo-400 animate-fade-in">
+            <FileText className="w-4 h-4 shrink-0" />
+            <span>
+              Sitemap detected — all pages will be scanned (up to 10)
+            </span>
+          </div>
+        )}
+
         {error && (
           <div className="flex items-center gap-2 text-sm text-red-400">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
+        )}
+
+        {!isSitemap && !error && (
+          <p className="text-xs text-zinc-500 text-center">
+            Enter a page URL or an XML sitemap to scan multiple pages at once
+          </p>
         )}
       </div>
     </form>

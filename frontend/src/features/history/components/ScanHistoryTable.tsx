@@ -12,6 +12,8 @@ import {
   Scan as ScanIcon,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
+  Globe,
+  FileText,
 } from "lucide-react";
 
 const ITEMS_PER_PAGE = 10;
@@ -79,15 +81,18 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
                 className="hover:bg-white/[0.02] transition-colors"
               >
                 <td className="px-6 py-4">
-                  <a
-                    href={scan.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors truncate max-w-xs"
-                  >
-                    <span className="truncate">{scan.url}</span>
-                    <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <ScanTypeBadge type={scan.scan_type} />
+                    <a
+                      href={scan.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors truncate max-w-xs"
+                    >
+                      <span className="truncate">{scan.url}</span>
+                      <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </a>
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-zinc-500">
                   {new Date(scan.scan_date).toLocaleDateString()}
@@ -211,6 +216,23 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
         </div>
       )}
     </div>
+  );
+}
+
+function ScanTypeBadge({ type }: { type?: Scan["scan_type"] }) {
+  if (type === "sitemap") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-violet-500/10 text-violet-400 border border-violet-500/20 shrink-0">
+        <FileText className="w-3 h-3" />
+        Sitemap
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
+      <Globe className="w-3 h-3" />
+      URL
+    </span>
   );
 }
 

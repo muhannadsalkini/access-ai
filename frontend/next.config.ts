@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  reactStrictMode: true,
+  devIndicators: false,
+  compiler: {
+    removeConsole: {
+      exclude: [], // removes EVERYTHING including errors
+    },
+  },
 };
 
 export default nextConfig;

@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertTriangle,
+  FileText,
 } from "lucide-react";
 
 interface ReportViewProps {
@@ -48,9 +49,17 @@ export default function ReportView({ result }: ReportViewProps) {
       <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 sm:p-8">
         <div className="flex flex-col sm:flex-row items-start justify-between gap-6">
           <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Accessibility Report
-            </h2>
+            <div className="flex items-center gap-3 mb-2">
+              <h2 className="text-2xl font-bold text-white">
+                Accessibility Report
+              </h2>
+              {scan.scan_type === "sitemap" && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                  <FileText className="w-3.5 h-3.5" />
+                  Sitemap Scan
+                </span>
+              )}
+            </div>
             <a
               href={scan.url}
               target="_blank"

@@ -2,17 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/shared/lib/utils";
-import { Radar, Sparkles, CheckCircle, Check } from "lucide-react";
+import { Radar, Sparkles, Check } from "lucide-react";
 
 const stages = [
   {
     key: "scanning",
     label: "Scanning website",
-    description: "Loading page and running accessibility checks...",
+    description: "Loading pages and running accessibility checks...",
     icon: Radar,
     color: "text-blue-400",
     bgColor: "bg-blue-500/10 border-blue-500/20",
-    activeGlow: "shadow-blue-500/20",
   },
   {
     key: "analyzing",
@@ -21,37 +20,39 @@ const stages = [
     icon: Sparkles,
     color: "text-violet-400",
     bgColor: "bg-violet-500/10 border-violet-500/20",
-    activeGlow: "shadow-violet-500/20",
-  },
-  {
-    key: "completed",
-    label: "Complete",
-    description: "Your report is ready!",
-    icon: CheckCircle,
-    color: "text-emerald-400",
-    bgColor: "bg-emerald-500/10 border-emerald-500/20",
-    activeGlow: "shadow-emerald-500/20",
   },
 ];
 
 export default function ScanProgress() {
   const [currentStage, setCurrentStage] = useState(0);
   const [dots, setDots] = useState("");
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     const dotsInterval = setInterval(() => {
       setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
     }, 500);
 
-    const timer1 = setTimeout(() => setCurrentStage(1), 5000);
-    const timer2 = setTimeout(() => setCurrentStage(2), 15000);
+    const elapsedInterval = setInterval(() => {
+      setElapsed((prev) => prev + 1);
+    }, 1000);
+
+    // Move to "Analyzing" stage after 8 seconds
+    const timer1 = setTimeout(() => setCurrentStage(1), 8000);
 
     return () => {
       clearInterval(dotsInterval);
+      clearInterval(elapsedInterval);
       clearTimeout(timer1);
-      clearTimeout(timer2);
     };
   }, []);
+
+  const formatElapsed = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins > 0) return `${mins}m ${secs}s`;
+    return `${secs}s`;
+  };
 
   const CurrentIcon = stages[currentStage].icon;
 
@@ -61,27 +62,36 @@ export default function ScanProgress() {
       <div className="text-center mb-10">
         <div className="relative inline-flex items-center justify-center w-20 h-20 mb-6">
           {/* Spinning ring */}
-          <div className={cn(
-            "absolute inset-0 rounded-full border-2 border-transparent animate-spin",
-            currentStage === 0 && "border-t-blue-500 border-r-blue-500/30",
-            currentStage === 1 && "border-t-violet-500 border-r-violet-500/30",
-            currentStage === 2 && "border-t-emerald-500 border-r-emerald-500/30"
-          )} style={{ animationDuration: "1.5s" }} />
+          <div
+            className={cn(
+              "absolute inset-0 rounded-full border-2 border-transparent animate-spin",
+              currentStage === 0 && "border-t-blue-500 border-r-blue-500/30",
+              currentStage === 1 && "border-t-violet-500 border-r-violet-500/30"
+            )}
+            style={{ animationDuration: "1.5s" }}
+          />
           {/* Background circle */}
-          <div className={cn(
-            "w-16 h-16 rounded-full border flex items-center justify-center",
-            stages[currentStage].bgColor
-          )}>
-            <CurrentIcon className={cn("w-7 h-7", stages[currentStage].color)} />
+          <div
+            className={cn(
+              "w-16 h-16 rounded-full border flex items-center justify-center",
+              stages[currentStage].bgColor
+            )}
+          >
+            <CurrentIcon
+              className={cn("w-7 h-7", stages[currentStage].color)}
+            />
           </div>
         </div>
 
         <h3 className="text-xl font-semibold text-white">
           {stages[currentStage].label}
-          {currentStage < 2 && <span className="text-zinc-500">{dots}</span>}
+          <span className="text-zinc-500">{dots}</span>
         </h3>
         <p className="text-sm text-zinc-400 mt-2">
           {stages[currentStage].description}
+        </p>
+        <p className="text-xs text-zinc-600 mt-3">
+          Elapsed: {formatElapsed(elapsed)}
         </p>
       </div>
 
@@ -134,13 +144,20 @@ export default function ScanProgress() {
                   {stage.label}
                 </span>
               </div>
-              {isActive && currentStage < 2 && (
+              {isActive && (
                 <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
               )}
             </div>
           );
         })}
       </div>
+
+      {/* Reassurance text */}
+      {elapsed > 15 && (
+        <p className="text-xs text-zinc-600 text-center mt-6 animate-fade-in">
+          This may take a moment. Please do not close this page.
+        </p>
+      )}
     </div>
   );
 }
