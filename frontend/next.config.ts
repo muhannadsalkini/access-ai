@@ -4,9 +4,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   devIndicators: false,
   compiler: {
-    removeConsole: {
-      exclude: [], // removes EVERYTHING including errors
-    },
+    removeConsole: true, // removes all console.* calls in production
   },
 };
 
