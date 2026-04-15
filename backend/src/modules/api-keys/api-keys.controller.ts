@@ -56,7 +56,7 @@ export async function remove(
   next: NextFunction
 ): Promise<void> {
   try {
-    const keyId = req.params.id;
+    const keyId = req.params.id as string;
     if (!keyId) {
       throw new AppError("API key ID is required.", 400);
     }
