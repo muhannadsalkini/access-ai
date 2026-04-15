@@ -12,6 +12,7 @@
 | **Backend** | Express.js, TypeScript, Playwright, axe-core | `backend/` |
 | **Browser Extension** | React 18, Vite, Tailwind CSS, Chrome MV3 | `extension/` |
 | **AI Agent** | Python, FastAPI, Google ADK, Gemini 2.0 Flash | `agent/` |
+| **MCP Server** | TypeScript, MCP SDK, stdio transport | `mcp-server/` |
 | **Database** | Supabase (PostgreSQL) | Managed |
 
 ## Getting Started
@@ -76,6 +77,7 @@
 | Backend | Render |
 | Agent | Render |
 | Browser Extension | Chrome Web Store (manual upload) |
+| MCP Server | npm (`npx accessai-mcp`) |
 | Database | Supabase Cloud |
 
 ## Browser Extension
@@ -109,6 +111,7 @@ AccessAI/
 ├── backend/           # Express.js (modular architecture)
 ├── extension/         # React + Vite + Chrome MV3 (browser extension)
 ├── agent/             # Python FastAPI + Google ADK
+├── mcp-server/        # MCP server for IDE agents (Cursor, Cline, etc.)
 ├── docker-compose.yml
 ├── .env.example
 └── README.md

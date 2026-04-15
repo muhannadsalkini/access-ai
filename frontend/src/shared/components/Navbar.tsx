@@ -9,6 +9,7 @@ import type { User } from "@supabase/supabase-js";
 import { cn } from "@/shared/lib/utils";
 import {
   Clock,
+  Settings,
   LogOut,
   LogIn,
   UserPlus,
@@ -99,6 +100,10 @@ export default function Navbar() {
                   <Clock className="w-4 h-4" />
                   History
                 </Link>
+                <Link href="/settings" className={navLinkClass("/settings")}>
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </Link>
 
                 <div className="w-px h-6 bg-white/10 mx-3" />
 
@@ -163,6 +168,10 @@ export default function Navbar() {
                   <Link href="/history" className={navLinkClass("/history")}>
                     <Clock className="w-4 h-4" />
                     History
+                  </Link>
+                  <Link href="/settings" className={navLinkClass("/settings")}>
+                    <Settings className="w-4 h-4" />
+                    Settings
                   </Link>
                   <div className="h-px bg-white/[0.06] my-2" />
                   <div className="flex items-center gap-3 px-3 py-2">

@@ -24,6 +24,10 @@ import {
   RefreshCw,
   ArrowLeft,
   ServerCrash,
+  Terminal,
+  MessageSquare,
+  History,
+  Globe,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -328,6 +332,151 @@ export default function HomePage() {
                 Get specific, actionable code-level fix suggestions for every
                 issue — ready to copy and implement immediately.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* IDE Integration / MCP Server Section */}
+      <section className="py-24 border-t border-white/[0.06]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Left — Text content */}
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 mb-6">
+                <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-xs font-medium text-emerald-300">
+                  MCP Server
+                </span>
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+                Scan directly from{" "}
+                <span className="gradient-text">your IDE</span>
+              </h2>
+
+              <p className="text-zinc-400 mb-8 leading-relaxed">
+                Use the AccessAI MCP server with Cursor, Cline, Claude Code, Windsurf, or
+                any MCP-compatible AI agent. Scan websites, get reports, and ask
+                follow-up questions — all without leaving your editor.
+              </p>
+
+              <div className="space-y-4 mb-8">
+                {[
+                  {
+                    icon: Globe,
+                    title: "Scan any URL",
+                    desc: "Run WCAG accessibility scans from a simple prompt",
+                  },
+                  {
+                    icon: History,
+                    title: "View scan history",
+                    desc: "Access all your past scans and reports in context",
+                  },
+                  {
+                    icon: MessageSquare,
+                    title: "Chat about issues",
+                    desc: "Ask the AI follow-up questions about how to fix issues",
+                  },
+                  {
+                    icon: Code,
+                    title: "Works with any AI SDK",
+                    desc: "Vercel AI SDK, OpenAI Agents, Google ADK, LangChain",
+                  },
+                ].map((item) => (
+                  <div key={item.title} className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center shrink-0 mt-0.5">
+                      <item.icon className="w-4 h-4 text-indigo-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-zinc-500">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <a
+                href="https://github.com/muhannadsalkini/access-ai/tree/main/mcp-server"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-center gap-2 text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                View setup guide
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+              </a>
+            </div>
+
+            {/* Right — Code snippet */}
+            <div className="relative">
+              <div className="absolute -inset-4 bg-gradient-to-br from-indigo-500/10 to-violet-500/5 rounded-3xl blur-xl pointer-events-none" />
+              <div className="relative rounded-2xl border border-white/[0.08] bg-[#0d1117] overflow-hidden shadow-2xl">
+                {/* Terminal header */}
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06] bg-white/[0.02]">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-500/60" />
+                    <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
+                    <div className="w-3 h-3 rounded-full bg-green-500/60" />
+                  </div>
+                  <span className="text-xs text-zinc-500 ml-2 font-mono">
+                    mcp.json
+                  </span>
+                </div>
+
+                {/* Code content */}
+                <pre className="p-5 text-sm leading-relaxed overflow-x-auto">
+                  <code>
+                    <span className="text-zinc-500">{"// Add to your IDE's MCP config\n"}</span>
+                    <span className="text-zinc-300">{"{\n"}</span>
+                    <span className="text-zinc-300">{"  "}</span>
+                    <span className="text-indigo-300">{'"mcpServers"'}</span>
+                    <span className="text-zinc-300">{": {\n"}</span>
+                    <span className="text-zinc-300">{"    "}</span>
+                    <span className="text-indigo-300">{'"accessai"'}</span>
+                    <span className="text-zinc-300">{": {\n"}</span>
+                    <span className="text-zinc-300">{"      "}</span>
+                    <span className="text-emerald-300">{'"command"'}</span>
+                    <span className="text-zinc-300">{": "}</span>
+                    <span className="text-amber-300">{'"npx"'}</span>
+                    <span className="text-zinc-300">{",\n"}</span>
+                    <span className="text-zinc-300">{"      "}</span>
+                    <span className="text-emerald-300">{'"args"'}</span>
+                    <span className="text-zinc-300">{": ["}</span>
+                    <span className="text-amber-300">{'"-y"'}</span>
+                    <span className="text-zinc-300">{", "}</span>
+                    <span className="text-amber-300">{'"accessai-mcp"'}</span>
+                    <span className="text-zinc-300">{"],\n"}</span>
+                    <span className="text-zinc-300">{"      "}</span>
+                    <span className="text-emerald-300">{'"env"'}</span>
+                    <span className="text-zinc-300">{": {\n"}</span>
+                    <span className="text-zinc-300">{"        "}</span>
+                    <span className="text-emerald-300">{'"ACCESSAI_API_KEY"'}</span>
+                    <span className="text-zinc-300">{": "}</span>
+                    <span className="text-amber-300">{'"ak_live_..."'}</span>
+                    <span className="text-zinc-300">{"\n"}</span>
+                    <span className="text-zinc-300">{"      }\n"}</span>
+                    <span className="text-zinc-300">{"    }\n"}</span>
+                    <span className="text-zinc-300">{"  }\n"}</span>
+                    <span className="text-zinc-300">{"}"}</span>
+                  </code>
+                </pre>
+              </div>
+
+              {/* IDE badges */}
+              <div className="flex flex-wrap justify-center gap-2 mt-6">
+                {["Cursor", "Cline", "Claude Code", "Windsurf", "Vercel AI SDK", "OpenAI SDK"].map(
+                  (name) => (
+                    <span
+                      key={name}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border border-white/[0.08] bg-white/[0.03] text-zinc-400"
+                    >
+                      {name}
+                    </span>
+                  )
+                )}
+              </div>
             </div>
           </div>
         </div>
