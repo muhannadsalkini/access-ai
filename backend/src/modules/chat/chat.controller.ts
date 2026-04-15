@@ -13,7 +13,7 @@ export async function getMessages(
   try {
     const scanId = req.params.scanId as string;
     const messages = await getChatMessages(scanId);
-    res.json({ messages });
+    res.json({ success: true, data: messages });
   } catch (error: any) {
     logger.error("Get chat messages error:", error);
     next(error);
@@ -43,7 +43,7 @@ export async function sendMessage(
     }
 
     const result = await sendChatMessage(scanId, message.trim());
-    res.json(result);
+    res.json({ success: true, data: result });
   } catch (error: any) {
     logger.error("Send chat message error:", error);
     next(error);

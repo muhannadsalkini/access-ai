@@ -129,7 +129,7 @@ export class ApiClient {
    * Create a new accessibility scan for a URL.
    */
   async createScan(url: string): Promise<ScanResponse> {
-    return this.request<ScanResponse>("POST", "/api/scans", { url }, 180_000);
+    return this.request<ScanResponse>("POST", "/api/scans", { url }, 600_000);
   }
 
   /**

@@ -13,7 +13,7 @@ export interface Config {
   apiKey: string;
 }
 
-const DEFAULT_BACKEND_URL = "https://accessai-backend.onrender.com";
+const DEFAULT_BACKEND_URL = "https://access-ai-backend.onrender.com";
 
 export function loadConfig(): Config {
   const apiKey = process.env.ACCESSAI_API_KEY;
