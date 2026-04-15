@@ -4,7 +4,13 @@ import { env } from "../../config/env";
 import { AppError } from "../../middleware/error-handler";
 import { AuthenticatedRequest } from "./auth.types";
 import { logger } from "../../utils/logger";
+import { verifyApiKey } from "../api-keys/api-keys.service";
 
+/**
+ * Authentication middleware that supports both:
+ * 1. Supabase JWT tokens (Bearer eyJ...)
+ * 2. AccessAI API keys (Bearer ak_live_...)
+ */
 export async function requireAuth(
   req: AuthenticatedRequest,
   _res: Response,
@@ -23,7 +29,20 @@ export async function requireAuth(
       throw new AppError("Missing access token.", 401);
     }
 
-    // Verify the token with Supabase
+    // Check if the token is an API key (starts with "ak_live_")
+    if (token.startsWith("ak_live_")) {
+      const result = await verifyApiKey(token);
+      if (!result) {
+        throw new AppError("Invalid API key.", 401);
+      }
+
+      req.userId = result.userId;
+      req.userEmail = "";
+      req.accessToken = token;
+      return next();
+    }
+
+    // Otherwise, verify as a Supabase JWT token
     const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
       global: {
         headers: { Authorization: `Bearer ${token}` },

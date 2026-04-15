@@ -3,6 +3,8 @@ import helmet from "helmet";
 import { corsMiddleware } from "./middleware/cors";
 import { generalLimiter } from "./middleware/rate-limiter";
 import { errorHandler } from "./middleware/error-handler";
+import authRoutes from "./modules/auth/auth.routes";
+import apiKeysRoutes from "./modules/api-keys/api-keys.routes";
 import scanRoutes from "./modules/scan/scan.routes";
 import reportRoutes from "./modules/report/report.routes";
 
@@ -24,6 +26,8 @@ app.get("/health", (_req, res) => {
 });
 
 // --- API Routes ---
+app.use("/api/auth", authRoutes);
+app.use("/api/api-keys", apiKeysRoutes);
 app.use("/api/scans", scanRoutes);
 app.use("/api/reports", reportRoutes);
 
