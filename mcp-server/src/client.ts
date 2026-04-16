@@ -60,7 +60,7 @@ export function createAccessAIClient(options: {
   backendUrl?: string;
 }): ApiClient {
   const config: Config = {
-    backendUrl: (options.backendUrl || "https://accessai-backend.onrender.com").replace(/\/+$/, ""),
+    backendUrl: (options.backendUrl || "https://access-ai-backend.onrender.com").replace(/\/+$/, ""),
     apiKey: options.apiKey,
   };
 
