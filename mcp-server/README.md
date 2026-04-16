@@ -26,14 +26,14 @@ This MCP server lets developer agents scan websites for WCAG accessibility issue
 ## Prerequisites
 
 - **Node.js 18+**
-- An **AccessAI account** (sign up at [access-ai-frontend-sepia.vercel.app](https://access-ai-frontend-sepia.vercel.app/))
+- An **AccessAI account** (sign up at [access-ai.solutions](https://access-ai.solutions))
 - An **API key** (generate one from your AccessAI dashboard → Settings → API Keys)
 
 ## Quick Setup
 
 ### Step 1: Generate an API Key
 
-1. Log in to your [AccessAI dashboard](https://access-ai-frontend-sepia.vercel.app/)
+1. Log in to your [AccessAI dashboard](https://access-ai.solutions)
 2. Go to **Settings → API Keys**
 3. Click **"Generate New Key"**
 4. Copy the key (it starts with `ak_live_...`) — it's only shown once!

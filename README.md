@@ -2,7 +2,7 @@
 
 **AccessAI** — Helps web developers instantly identify, understand, and fix accessibility barriers by combining automated WCAG scanning with AI-powered expert recommendations.
 
-🌐 **Live:** [https://access-ai-frontend-sepia.vercel.app/](https://access-ai-frontend-sepia.vercel.app/)
+🌐 **Live:** [https://access-ai.solutions](https://access-ai.solutions)
 
 ## Architecture
 
