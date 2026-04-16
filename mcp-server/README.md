@@ -2,6 +2,11 @@
 
 **Model Context Protocol (MCP) server** for [AccessAI](https://github.com/muhannadsalkini/access-ai) — AI-powered web accessibility scanning and analysis, directly from your IDE.
 
+[![npm version](https://img.shields.io/npm/v/accessai-mcp.svg)](https://www.npmjs.com/package/accessai-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/accessai-mcp.svg)](https://www.npmjs.com/package/accessai-mcp)
+
+📦 **npm:** [https://www.npmjs.com/package/accessai-mcp](https://www.npmjs.com/package/accessai-mcp)
+
 Works with **Cursor**, **Cline**, **Claude Code**, **Windsurf**, and any MCP-compatible developer agent.
 
 ## What it does
@@ -13,6 +18,7 @@ This MCP server lets developer agents scan websites for WCAG accessibility issue
 | Tool | Description |
 |------|-------------|
 | `scan_url` | Scan a website URL for WCAG accessibility issues with AI analysis |
+| `scan_code` | Scan raw HTML code directly for accessibility issues (no URL needed) |
 | `get_scan_history` | View your past accessibility scan history |
 | `get_scan_report` | Get the full detailed report for a specific scan |
 | `chat_about_scan` | Ask the AI follow-up questions about scan results |
