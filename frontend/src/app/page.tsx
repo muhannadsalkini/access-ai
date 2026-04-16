@@ -515,10 +515,26 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-white/[0.06] py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-sm text-zinc-600">
             Built with accessibility in mind.
           </p>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/privacy"
+              className="text-sm text-zinc-600 hover:text-zinc-400 transition-colors"
+            >
+              Privacy Policy
+            </Link>
+            <a
+              href="https://github.com/muhannadsalkini/access-ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-zinc-600 hover:text-zinc-400 transition-colors"
+            >
+              GitHub
+            </a>
+          </div>
         </div>
       </footer>
     </div>
