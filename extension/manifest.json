@@ -22,6 +22,7 @@
   },
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
-    "https://*/*"
+    "https://access-ai-backend.onrender.com/*",
+    "https://rqhpolumeiloyslxjljo.supabase.co/*"
   ]
 }
