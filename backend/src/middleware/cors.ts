@@ -7,15 +7,13 @@ import { env } from "../config/env";
 const allowedOrigins: (string | RegExp)[] = [
   env.frontendUrl,
   "http://localhost:3000",
+  // Always allow all Chrome extension origins
+  /^chrome-extension:\/\//,
 ];
 
-if (env.extensionOrigin) {
-  if (env.extensionOrigin === "chrome-extension://*") {
-    // Allow all Chrome extension origins (dev convenience)
-    allowedOrigins.push(/^chrome-extension:\/\//);
-  } else {
-    allowedOrigins.push(env.extensionOrigin);
-  }
+if (env.extensionOrigin && env.extensionOrigin !== "chrome-extension://*") {
+  // Allow a specific extension origin if explicitly configured
+  allowedOrigins.push(env.extensionOrigin);
 }
 
 export const corsMiddleware = cors({
@@ -30,7 +28,9 @@ export const corsMiddleware = cors({
     if (allowed) {
       callback(null, true);
     } else {
-      callback(new Error(`Origin ${origin} not allowed by CORS`));
+      // Return null (block) instead of throwing — this avoids an unhandled
+      // Error propagating to the generic 500 error handler.
+      callback(null, false);
     }
   },
   credentials: true,
