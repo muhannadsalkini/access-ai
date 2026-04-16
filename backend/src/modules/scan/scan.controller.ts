@@ -48,6 +48,31 @@ export async function getScans(
   }
 }
 
+export async function createCodeScan(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { html, title } = req.body;
+
+    if (!html || typeof html !== "string" || html.trim().length === 0) {
+      throw new AppError("html is required.", 400);
+    }
+
+    logger.info(`User ${req.userId} requested code scan`);
+
+    const result = await scanService.createCodeScan(req.userId, html, title);
+
+    res.status(201).json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getScanById(
   req: AuthenticatedRequest,
   res: Response,

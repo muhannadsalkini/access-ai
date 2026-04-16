@@ -16,7 +16,7 @@ export interface ScanRecord {
   scan_date: string;
   accessibility_score: number;
   status: "pending" | "scanning" | "analyzing" | "completed" | "failed";
-  scan_type: "url" | "sitemap";
+  scan_type: "url" | "sitemap" | "code";
 }
 
 export interface IssueRecord {
@@ -130,6 +130,13 @@ export class ApiClient {
    */
   async createScan(url: string): Promise<ScanResponse> {
     return this.request<ScanResponse>("POST", "/api/scans", { url }, 600_000);
+  }
+
+  /**
+   * Create a new accessibility scan from raw HTML code.
+   */
+  async createCodeScan(html: string, title?: string): Promise<ScanResponse> {
+    return this.request<ScanResponse>("POST", "/api/scans/code", { html, title }, 300_000);
   }
 
   /**

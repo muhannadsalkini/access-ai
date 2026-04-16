@@ -105,6 +105,63 @@ export async function runAxeScan(url: string): Promise<ScanResult> {
   }
 }
 
+/**
+ * Run axe-core accessibility scan directly on raw HTML code.
+ * Used by AI agents to scan code without needing a live URL.
+ */
+export async function runAxeScanOnCode(html: string): Promise<ScanResult> {
+  const browserInstance = await getBrowser();
+  let context: import("playwright").BrowserContext | null = null;
+  let page: Page | null = null;
+
+  try {
+    context = await browserInstance.newContext({
+      viewport: { width: 1280, height: 720 },
+    });
+    page = await context.newPage();
+    page.setDefaultTimeout(30000);
+
+    logger.info("Injecting HTML code into blank page for axe scan...");
+    // Use setContent to inject raw HTML directly (no network request needed)
+    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 15000 });
+
+    logger.info("Running axe-core accessibility scan on code...");
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+
+    const violations: AxeViolation[] = results.violations.map((v) => ({
+      ruleId: v.id,
+      impact: v.impact || "unknown",
+      description: v.description,
+      help: v.help,
+      helpUrl: v.helpUrl,
+      tags: v.tags,
+      affectedElements: v.nodes.map((node) => ({
+        selector: node.target.join(", "),
+        html: node.html,
+        failureSummary: node.failureSummary || "",
+      })),
+    }));
+
+    return {
+      url: "code://inline",
+      violations,
+      violationCount: results.violations.length,
+      passCount: results.passes.length,
+      incompleteCount: results.incomplete.length,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error) {
+    logger.error("Code scan failed:", error);
+    throw error;
+  } finally {
+    if (context) {
+      await context.close().catch(() => {});
+    }
+  }
+}
+
 // Cleanup browser on process exit
 export async function closeBrowser(): Promise<void> {
   if (browser) {

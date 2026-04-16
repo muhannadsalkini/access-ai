@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { supabaseAdmin } from "../../services/supabase/client";
 import { validateUrl } from "../../services/accessibility/url-validator";
-import { runAxeScan, AxeViolation } from "../../services/accessibility/axe-scanner";
+import { runAxeScan, runAxeScanOnCode, AxeViolation } from "../../services/accessibility/axe-scanner";
 import { isSitemapUrl, parseSitemap } from "../../services/accessibility/sitemap-parser";
 import { callAgent } from "../../services/agent/agent-client";
 import { AppError } from "../../middleware/error-handler";
@@ -212,6 +212,108 @@ export async function getScanById(
     issues: issues || [],
     report: report || null,
   };
+}
+
+export async function createCodeScan(
+  userId: string,
+  html: string,
+  title?: string
+): Promise<ScanResponse> {
+  if (!html || html.trim().length === 0) {
+    throw new AppError("HTML code is required.", 400);
+  }
+
+  if (html.length > 500_000) {
+    throw new AppError("HTML code too large (max 500KB).", 400);
+  }
+
+  // Use a descriptive label as the "url" field for code scans
+  const label = title ? `code://${title}` : "code://inline";
+
+  const scanId = uuidv4();
+  const scanRecord: ScanRecord = {
+    id: scanId,
+    user_id: userId,
+    url: label,
+    scan_date: new Date().toISOString(),
+    accessibility_score: 0,
+    status: "scanning",
+    scan_type: "code",
+  };
+
+  const { error: insertError } = await supabaseAdmin
+    .from("scans")
+    .insert(scanRecord);
+
+  if (insertError) {
+    logger.error("Failed to create code scan record:", insertError);
+    throw new AppError("Failed to create scan. Please try again.", 500);
+  }
+
+  try {
+    logger.info(`Starting code scan (scan: ${scanId}), html length: ${html.length} chars`);
+    await updateScanStatus(scanId, "scanning");
+
+    const scanResult = await runAxeScanOnCode(html);
+    const allViolations = scanResult.violations;
+
+    logger.info(`Found ${allViolations.length} violations. Sending to AI agent...`);
+    await updateScanStatus(scanId, "analyzing");
+
+    const agentResponse = await callAgent({
+      url: label,
+      scanId,
+      violations: allViolations,
+    });
+
+    const issues: IssueRecord[] = agentResponse.issues.map((issue) => ({
+      id: uuidv4(),
+      scan_id: scanId,
+      issue_type: issue.issueType,
+      severity: issue.severity,
+      description: issue.description,
+      recommendation: issue.recommendation,
+      wcag_reference: issue.wcagReference,
+    }));
+
+    if (issues.length > 0) {
+      const { error: issuesError } = await supabaseAdmin
+        .from("issues")
+        .insert(issues);
+      if (issuesError) {
+        logger.error("Failed to store issues:", issuesError);
+      }
+    }
+
+    const report: ReportRecord = {
+      id: uuidv4(),
+      scan_id: scanId,
+      summary: agentResponse.summary,
+      priority_recommendations: agentResponse.priorityRecommendations,
+    };
+
+    const { error: reportError } = await supabaseAdmin
+      .from("reports")
+      .insert(report);
+    if (reportError) {
+      logger.error("Failed to store report:", reportError);
+    }
+
+    await supabaseAdmin
+      .from("scans")
+      .update({ accessibility_score: agentResponse.accessibilityScore, status: "completed" })
+      .eq("id", scanId);
+
+    return {
+      scan: { ...scanRecord, accessibility_score: agentResponse.accessibilityScore, status: "completed" },
+      issues,
+      report,
+    };
+  } catch (error) {
+    await updateScanStatus(scanId, "failed");
+    logger.error(`Code scan ${scanId} failed:`, error);
+    throw new AppError("Code scan failed. Please check the HTML and try again.", 500);
+  }
 }
 
 async function updateScanStatus(

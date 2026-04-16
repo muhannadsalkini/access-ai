@@ -27,6 +27,7 @@ import { handleScanUrl } from "./tools/scan-url.js";
 import { handleGetScanHistory } from "./tools/get-scan-history.js";
 import { handleGetScanReport } from "./tools/get-scan-report.js";
 import { handleChatAboutScan } from "./tools/chat-about-scan.js";
+import { handleScanCode } from "./tools/scan-code.js";
 import {
   LATEST_SCAN_RESOURCE,
   handleLatestScanResource,
@@ -46,7 +47,7 @@ const apiClient = new ApiClient(config, auth);
 
 const server = new McpServer({
   name: "accessai",
-  version: "1.0.0",
+  version: "1.1.0",
 });
 
 // ---------------------------------------------------------------------------
@@ -117,6 +118,28 @@ server.tool(
   },
   async ({ scan_id, message }) => {
     const result = await handleChatAboutScan(apiClient, { scan_id, message });
+    return { content: [{ type: "text", text: result }] };
+  }
+);
+
+server.tool(
+  "scan_code",
+  "Scan raw HTML code directly for WCAG accessibility issues using axe-core and get AI-powered analysis with severity classifications, descriptions, fix recommendations, and an overall accessibility score. Use this when you have HTML code (e.g. a component or page template) and want to check it for accessibility issues without needing a live URL. Results are saved to your scan history.",
+  {
+    html: z
+      .string()
+      .describe(
+        "The raw HTML code to scan for accessibility issues. Can be a full page, a component, or any HTML snippet."
+      ),
+    title: z
+      .string()
+      .optional()
+      .describe(
+        "Optional label for this code scan (e.g. 'LoginForm', 'NavBar component'). Used to identify the scan in your history."
+      ),
+  },
+  async ({ html, title }) => {
+    const result = await handleScanCode(apiClient, { html, title });
     return { content: [{ type: "text", text: result }] };
   }
 );

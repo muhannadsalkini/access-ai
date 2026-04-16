@@ -9,8 +9,11 @@ const router = Router();
 // All scan routes require authentication
 router.use(requireAuth as any);
 
-// POST /api/scans — Create a new scan
+// POST /api/scans — Create a new scan from a URL
 router.post("/", scanLimiter, scanController.createScan as any);
+
+// POST /api/scans/code — Create a new scan from raw HTML code
+router.post("/code", scanLimiter, scanController.createCodeScan as any);
 
 // GET /api/scans — Get user's scan history
 router.get("/", scanController.getScans as any);
