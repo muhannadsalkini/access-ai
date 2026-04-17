@@ -32,16 +32,16 @@ export async function handleScanUrl(
   }
 
   try {
+    const isGuest = apiClient.isGuestMode();
     const result: ScanResponse = await apiClient.createScan(url);
-
-    return formatScanResult(result);
+    return formatScanResult(result, isGuest);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return `Error scanning ${url}: ${message}`;
   }
 }
 
-function formatScanResult(result: ScanResponse): string {
+function formatScanResult(result: ScanResponse, isGuest: boolean): string {
   const { scan, issues, report } = result;
 
   let output = `# Accessibility Scan Results\n\n`;
@@ -88,7 +88,11 @@ function formatScanResult(result: ScanResponse): string {
     output += `## No issues found! 🎉\n\nThe website appears to have no detectable WCAG accessibility violations.\n`;
   }
 
-  output += `\n---\n*Use the \`chat_about_scan\` tool with scan ID \`${scan.id}\` to ask follow-up questions about these results.*`;
+  if (isGuest) {
+    output += `\n---\n> ⚠️ **Guest mode** — results were not saved to history.\n> Add an \`ACCESSAI_API_KEY\` to enable history, reports, and AI chat.\n> Get a free key at: https://access-ai.solutions → Settings → API Keys`;
+  } else {
+    output += `\n---\n*Use the \`chat_about_scan\` tool with scan ID \`${scan.id}\` to ask follow-up questions about these results.*`;
+  }
 
   return output;
 }

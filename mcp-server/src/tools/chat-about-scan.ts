@@ -26,10 +26,17 @@ export const CHAT_ABOUT_SCAN_TOOL = {
   },
 };
 
+const GUEST_MODE_MSG =
+  "⚠️ **API key required.**\n\n" +
+  "This tool requires an `ACCESSAI_API_KEY` to chat about scan results.\n\n" +
+  "Get a free key at: https://access-ai.solutions → Settings → API Keys";
+
 export async function handleChatAboutScan(
   apiClient: ApiClient,
   args: { scan_id: string; message: string }
 ): Promise<string> {
+  if (apiClient.isGuestMode()) return GUEST_MODE_MSG;
+
   const { scan_id, message } = args;
 
   if (!scan_id) {

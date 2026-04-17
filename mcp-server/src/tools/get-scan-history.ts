@@ -21,10 +21,19 @@ export const GET_SCAN_HISTORY_TOOL = {
   },
 };
 
+const GUEST_MODE_MSG =
+  "⚠️ **API key required.**\n\n" +
+  "This tool requires an `ACCESSAI_API_KEY` to access your scan history.\n\n" +
+  "Get a free key at: https://access-ai.solutions → Settings → API Keys\n\n" +
+  "Then add it to your MCP config:\n" +
+  '```json\n{ "env": { "ACCESSAI_API_KEY": "ak_live_..." } }\n```';
+
 export async function handleGetScanHistory(
   apiClient: ApiClient,
   args: { limit?: number }
 ): Promise<string> {
+  if (apiClient.isGuestMode()) return GUEST_MODE_MSG;
+
   const limit = args.limit || 10;
 
   try {

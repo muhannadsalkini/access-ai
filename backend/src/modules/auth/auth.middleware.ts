@@ -11,6 +11,36 @@ import { verifyApiKey } from "../api-keys/api-keys.service";
  * 1. Supabase JWT tokens (Bearer eyJ...)
  * 2. AccessAI API keys (Bearer ak_live_...)
  */
+
+/**
+ * Optional authentication middleware — same as requireAuth but allows
+ * unauthenticated requests through with req.userId = null.
+ * Used for scan endpoints that support guest (keyless) mode.
+ */
+export async function optionalAuth(
+  req: AuthenticatedRequest,
+  _res: Response,
+  next: NextFunction
+): Promise<void> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    // No token provided — continue as guest
+    req.userId = null as any;
+    req.userEmail = "";
+    return next();
+  }
+
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    req.userId = null as any;
+    req.userEmail = "";
+    return next();
+  }
+
+  // Re-use the full requireAuth logic now that we know a token was provided
+  return requireAuth(req, _res, next);
+}
+
 export async function requireAuth(
   req: AuthenticatedRequest,
   _res: Response,

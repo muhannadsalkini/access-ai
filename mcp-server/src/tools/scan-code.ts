@@ -8,7 +8,7 @@ import type { ApiClient } from "../api-client.js";
 export const SCAN_CODE_TOOL = {
   name: "scan_code",
   description:
-    "Scan raw HTML code directly for WCAG accessibility issues using axe-core and get AI-powered analysis with severity classifications, descriptions, fix recommendations, and an overall accessibility score. Use this when you have HTML code (e.g. a component or page template) and want to check it for accessibility issues without needing a live URL. Results are saved to your scan history.",
+    "Scan raw HTML code directly for WCAG accessibility issues using axe-core and get AI-powered analysis with severity classifications, descriptions, fix recommendations, and an overall accessibility score. Use this when you have HTML code (e.g. a component or page template) and want to check it for accessibility issues without needing a live URL. Results are saved to your scan history when an API key is configured.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -42,10 +42,7 @@ export async function handleScanCode(
   }
 
   try {
-    const label = title ? `"${title}"` : "the provided HTML code";
-    let output = `## Scanning ${label} for accessibility issues...\n\n`;
-    output += `*Running axe-core WCAG analysis on your code — this may take 30-60 seconds...*\n\n`;
-
+    const isGuest = apiClient.isGuestMode();
     const result = await apiClient.createCodeScan(html, title);
 
     const { scan, issues, report } = result;
@@ -54,7 +51,7 @@ export async function handleScanCode(
     const score = scan.accessibility_score;
     const scoreEmoji = score >= 90 ? "🟢" : score >= 70 ? "🟡" : "🔴";
 
-    output = `## Code Accessibility Scan Results\n\n`;
+    let output = `## Code Accessibility Scan Results\n\n`;
     output += `**Label:** ${title || "Inline HTML"}\n`;
     output += `**Score:** ${scoreEmoji} ${score}/100\n`;
     output += `**Scan ID:** \`${scan.id}\`\n\n`;
@@ -99,7 +96,11 @@ export async function handleScanCode(
       }
     }
 
-    output += `---\n*Use \`chat_about_scan\` with scan ID \`${scan.id}\` to ask follow-up questions.*`;
+    if (isGuest) {
+      output += `---\n> ⚠️ **Guest mode** — results were not saved to history.\n> Add an \`ACCESSAI_API_KEY\` to enable history, reports, and AI chat.\n> Get a free key at: https://access-ai.solutions → Settings → API Keys`;
+    } else {
+      output += `---\n*Use \`chat_about_scan\` with scan ID \`${scan.id}\` to ask follow-up questions.*`;
+    }
 
     return output;
   } catch (error) {

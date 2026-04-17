@@ -20,10 +20,17 @@ export const GET_SCAN_REPORT_TOOL = {
   },
 };
 
+const GUEST_MODE_MSG =
+  "⚠️ **API key required.**\n\n" +
+  "This tool requires an `ACCESSAI_API_KEY` to retrieve scan reports.\n\n" +
+  "Get a free key at: https://access-ai.solutions → Settings → API Keys";
+
 export async function handleGetScanReport(
   apiClient: ApiClient,
   args: { scan_id: string }
 ): Promise<string> {
+  if (apiClient.isGuestMode()) return GUEST_MODE_MSG;
+
   const { scan_id } = args;
 
   if (!scan_id) {

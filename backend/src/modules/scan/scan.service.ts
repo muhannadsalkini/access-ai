@@ -13,6 +13,138 @@ import {
   ScanResponse,
 } from "./scan.types";
 
+/**
+ * Guest scan — runs the full scan pipeline but does NOT save anything to the
+ * database.  Used when no API key is provided (keyless/guest mode).
+ */
+export async function createGuestScan(url: string): Promise<ScanResponse> {
+  const validatedUrl = await validateUrl(url);
+  const scanType = isSitemapUrl(validatedUrl) ? "sitemap" : "url";
+  const scanId = uuidv4();
+
+  let allViolations: AxeViolation[] = [];
+
+  if (scanType === "sitemap") {
+    logger.info(`[guest] Sitemap scan for ${validatedUrl}`);
+    const pageUrls = await parseSitemap(validatedUrl);
+    for (const pageUrl of pageUrls) {
+      try {
+        const pageScan = await runAxeScan(pageUrl);
+        allViolations = allViolations.concat(
+          pageScan.violations.map((v) => ({
+            ...v,
+            description: `[${pageUrl}] ${v.description}`,
+          }))
+        );
+      } catch {
+        logger.warn(`[guest] Failed to scan page ${pageUrl}. Skipping.`);
+      }
+    }
+  } else {
+    logger.info(`[guest] URL scan for ${validatedUrl}`);
+    const scanResult = await runAxeScan(validatedUrl);
+    allViolations = scanResult.violations;
+  }
+
+  logger.info(`[guest] ${allViolations.length} violations — calling agent`);
+  const agentResponse = await callAgent({
+    url: validatedUrl,
+    scanId,
+    violations: allViolations,
+  });
+
+  const issues: IssueRecord[] = agentResponse.issues.map((issue) => ({
+    id: uuidv4(),
+    scan_id: scanId,
+    issue_type: issue.issueType,
+    severity: issue.severity,
+    description: issue.description,
+    recommendation: issue.recommendation,
+    wcag_reference: issue.wcagReference,
+  }));
+
+  const report: ReportRecord = {
+    id: uuidv4(),
+    scan_id: scanId,
+    summary: agentResponse.summary,
+    priority_recommendations: agentResponse.priorityRecommendations,
+  };
+
+  return {
+    scan: {
+      id: scanId,
+      user_id: "guest",
+      url: validatedUrl,
+      scan_date: new Date().toISOString(),
+      accessibility_score: agentResponse.accessibilityScore,
+      status: "completed",
+      scan_type: scanType,
+    },
+    issues,
+    report,
+  };
+}
+
+/**
+ * Guest code scan — same as createGuestScan but for raw HTML.
+ */
+export async function createGuestCodeScan(
+  html: string,
+  title?: string
+): Promise<ScanResponse> {
+  if (!html || html.trim().length === 0) {
+    throw new AppError("HTML code is required.", 400);
+  }
+  if (html.length > 500_000) {
+    throw new AppError("HTML code too large (max 500KB).", 400);
+  }
+
+  const label = title ? `code://${title}` : "code://inline";
+  const scanId = uuidv4();
+
+  logger.info(`[guest] Code scan, html length: ${html.length} chars`);
+  const scanResult = await runAxeScanOnCode(html);
+  const allViolations = scanResult.violations;
+
+  logger.info(`[guest] ${allViolations.length} violations — calling agent`);
+  const agentResponse = await callAgent({
+    url: label,
+    scanId,
+    violations: allViolations,
+  });
+
+  const issues: IssueRecord[] = agentResponse.issues.map((issue) => ({
+    id: uuidv4(),
+    scan_id: scanId,
+    issue_type: issue.issueType,
+    severity: issue.severity,
+    description: issue.description,
+    recommendation: issue.recommendation,
+    wcag_reference: issue.wcagReference,
+  }));
+
+  const report: ReportRecord = {
+    id: uuidv4(),
+    scan_id: scanId,
+    summary: agentResponse.summary,
+    priority_recommendations: agentResponse.priorityRecommendations,
+  };
+
+  return {
+    scan: {
+      id: scanId,
+      user_id: "guest",
+      url: label,
+      scan_date: new Date().toISOString(),
+      accessibility_score: agentResponse.accessibilityScore,
+      status: "completed",
+      scan_type: "code",
+    },
+    issues,
+    report,
+  };
+}
+
 export async function createScan(
   userId: string,
   url: string

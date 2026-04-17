@@ -90,7 +90,17 @@ export class ApiClient {
   }
 
   /**
-   * Make an authenticated request to the backend.
+   * Returns true when no API key is configured (guest / keyless mode).
+   * In guest mode, scan_url and scan_code work but results are not saved.
+   */
+  isGuestMode(): boolean {
+    return this.auth.isGuestMode();
+  }
+
+  /**
+   * Make a request to the backend. If a token is available it is sent as
+   * a Bearer header; in guest mode the Authorization header is omitted so
+   * the backend falls through to its optional-auth path.
    */
   private async request<T>(
     method: string,
@@ -101,12 +111,16 @@ export class ApiClient {
     const token = await this.auth.getAccessToken();
     const url = `${this.config.backendUrl}${path}`;
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetch(url, {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(timeoutMs),
     });

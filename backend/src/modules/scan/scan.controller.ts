@@ -18,8 +18,14 @@ export async function createScan(
       throw new AppError(message, 400);
     }
 
-    logger.info(`User ${req.userId} requested scan for: ${parsed.data.url}`);
+    // Guest mode — no userId means no DB persistence
+    if (!req.userId) {
+      logger.info(`[guest] Scan requested for: ${parsed.data.url}`);
+      const result = await scanService.createGuestScan(parsed.data.url);
+      return void res.status(201).json({ success: true, data: result });
+    }
 
+    logger.info(`User ${req.userId} requested scan for: ${parsed.data.url}`);
     const result = await scanService.createScan(req.userId, parsed.data.url);
 
     res.status(201).json({
@@ -58,6 +64,13 @@ export async function createCodeScan(
 
     if (!html || typeof html !== "string" || html.trim().length === 0) {
       throw new AppError("html is required.", 400);
+    }
+
+    // Guest mode — no userId means no DB persistence
+    if (!req.userId) {
+      logger.info(`[guest] Code scan requested`);
+      const result = await scanService.createGuestCodeScan(html, title);
+      return void res.status(201).json({ success: true, data: result });
     }
 
     logger.info(`User ${req.userId} requested code scan`);
