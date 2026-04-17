@@ -86,7 +86,7 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
                     <ScanTypeBadge type={scan.scan_type} />
                     {scan.scan_type === "code" ? (
                       <span className="text-sm text-zinc-300 truncate max-w-xs">
-                        {scan.url}
+                        {scan.url.replace(/^code:\/\//, "") || "Inline HTML"}
                       </span>
                     ) : (
                       <a
@@ -144,7 +144,7 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
                 <ScanTypeBadge type={scan.scan_type} />
                 {scan.scan_type === "code" ? (
                   <span className="text-sm text-zinc-300 truncate font-medium">
-                    {scan.url}
+                    {scan.url.replace(/^code:\/\//, "") || "Inline HTML"}
                   </span>
                 ) : (
                   <a
