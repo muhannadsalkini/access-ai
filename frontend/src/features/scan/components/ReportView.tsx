@@ -28,7 +28,9 @@ interface ReportViewProps {
 }
 
 export default function ReportView({ result }: ReportViewProps) {
-  const { scan, issues, report } = result;
+  const { scan, report } = result;
+  // Defensive: default to empty array if issues is undefined/null
+  const issues = Array.isArray(result.issues) ? result.issues : [];
 
   // Sort issues by severity
   const sortedIssues = [...issues].sort(

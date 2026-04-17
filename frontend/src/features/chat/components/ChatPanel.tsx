@@ -44,8 +44,9 @@ export default function ChatPanel({ scanId }: ChatPanelProps) {
     const loadMessages = async () => {
       try {
         const existing = await getChatMessages(scanId);
-        setMessages(existing);
-        if (existing.length > 0) {
+        const safe = Array.isArray(existing) ? existing : [];
+        setMessages(safe);
+        if (safe.length > 0) {
           setExpanded(true);
         }
       } catch {

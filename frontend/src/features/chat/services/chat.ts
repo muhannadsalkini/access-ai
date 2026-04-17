@@ -2,13 +2,9 @@ import { api } from "@/shared/lib/api";
 import { createClient } from "@/shared/lib/supabase/client";
 import type { ChatMessage } from "@/shared/types";
 
-interface GetMessagesResponse {
-  messages: ChatMessage[];
-}
-
-interface SendMessageResponse {
-  message: ChatMessage;
-  response: ChatMessage;
+interface ApiSuccess<T> {
+  success: boolean;
+  data: T;
 }
 
 async function getToken(): Promise<string> {
@@ -23,11 +19,11 @@ export async function getChatMessages(
   scanId: string
 ): Promise<ChatMessage[]> {
   const token = await getToken();
-  const data = await api<GetMessagesResponse>(
+  const response = await api<ApiSuccess<ChatMessage[]>>(
     `/api/scans/${scanId}/chat`,
     { token }
   );
-  return data.messages;
+  return Array.isArray(response.data) ? response.data : [];
 }
 
 export async function clearChatMessages(
@@ -40,16 +36,22 @@ export async function clearChatMessages(
   });
 }
 
+interface SendMessageData {
+  message: ChatMessage;
+  response: ChatMessage;
+}
+
 export async function sendChatMessage(
   scanId: string,
   message: string
-): Promise<SendMessageResponse> {
+): Promise<SendMessageData> {
   const token = await getToken();
-  return api<SendMessageResponse>(`/api/scans/${scanId}/chat`, {
+  const response = await api<ApiSuccess<SendMessageData>>(`/api/scans/${scanId}/chat`, {
     method: "POST",
     body: { message },
     token,
   });
+  return response.data;
 }
 
 // ---------------------------------------------------------------------------

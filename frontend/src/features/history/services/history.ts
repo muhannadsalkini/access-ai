@@ -21,5 +21,14 @@ export async function getScanDetail(scanId: string): Promise<ScanResult> {
     token,
   });
 
-  return response.data;
+  const data = response.data;
+
+  // Defensive: ensure issues is always an array and report is always defined or null.
+  // Prevents crashes if the backend returns a partial/unexpected response shape.
+  return {
+    ...data,
+    issues: Array.isArray(data.issues) ? data.issues : [],
+    report: data.report ?? null,
+    scan: data.scan,
+  };
 }
