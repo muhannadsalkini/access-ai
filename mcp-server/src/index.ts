@@ -47,7 +47,7 @@ const apiClient = new ApiClient(config, auth);
 
 const server = new McpServer({
   name: "accessai",
-  version: "1.1.0",
+  version: "1.1.1",
 });
 
 // ---------------------------------------------------------------------------

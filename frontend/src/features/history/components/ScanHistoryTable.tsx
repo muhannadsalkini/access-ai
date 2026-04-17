@@ -14,6 +14,7 @@ import {
   ChevronRight as ChevronRightIcon,
   Globe,
   FileText,
+  Code,
 } from "lucide-react";
 
 const ITEMS_PER_PAGE = 10;
@@ -83,15 +84,21 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     <ScanTypeBadge type={scan.scan_type} />
-                    <a
-                      href={scan.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors truncate max-w-xs"
-                    >
-                      <span className="truncate">{scan.url}</span>
-                      <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </a>
+                    {scan.scan_type === "code" ? (
+                      <span className="text-sm text-zinc-300 truncate max-w-xs">
+                        {scan.url}
+                      </span>
+                    ) : (
+                      <a
+                        href={scan.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors truncate max-w-xs"
+                      >
+                        <span className="truncate">{scan.url}</span>
+                        <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </a>
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-zinc-500">
@@ -133,14 +140,23 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
         {paginatedScans.map((scan) => (
           <div key={scan.id} className="p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
-              <a
-                href={scan.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-indigo-400 hover:text-indigo-300 truncate flex-1 font-medium"
-              >
-                {scan.url}
-              </a>
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <ScanTypeBadge type={scan.scan_type} />
+                {scan.scan_type === "code" ? (
+                  <span className="text-sm text-zinc-300 truncate font-medium">
+                    {scan.url}
+                  </span>
+                ) : (
+                  <a
+                    href={scan.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-indigo-400 hover:text-indigo-300 truncate font-medium"
+                  >
+                    {scan.url}
+                  </a>
+                )}
+              </div>
               <StatusBadge status={scan.status} />
             </div>
             <div className="flex items-center justify-between">
@@ -225,6 +241,14 @@ function ScanTypeBadge({ type }: { type?: Scan["scan_type"] }) {
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-violet-500/10 text-violet-400 border border-violet-500/20 shrink-0">
         <FileText className="w-3 h-3" />
         Sitemap
+      </span>
+    );
+  }
+  if (type === "code") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+        <Code className="w-3 h-3" />
+        Code
       </span>
     );
   }

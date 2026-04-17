@@ -1,6 +1,6 @@
 {
   "name": "accessai-mcp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "MCP server for AccessAI — AI-powered web accessibility scanning and analysis for developer agents (Cursor, Cline, Claude Code, etc.)",
   "main": "dist/index.js",
   "bin": {

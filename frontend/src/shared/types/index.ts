@@ -7,7 +7,7 @@ export interface Scan {
   scan_date: string;
   accessibility_score: number;
   status: "pending" | "scanning" | "analyzing" | "completed" | "failed";
-  scan_type: "url" | "sitemap";
+  scan_type: "url" | "sitemap" | "code";
 }
 
 export interface Issue {
