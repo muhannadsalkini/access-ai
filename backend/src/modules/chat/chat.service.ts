@@ -5,6 +5,15 @@ import { env } from "../../config/env";
 import type { ChatMessage, SendChatResponse } from "./chat.types";
 import type { Response } from "express";
 
+/** Build auth headers for direct fetch calls to the agent service. */
+function agentHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (env.agentInternalSecret) {
+    headers["X-Internal-Secret"] = env.agentInternalSecret;
+  }
+  return headers;
+}
+
 /**
  * Get all chat messages for a scan.
  */
@@ -202,7 +211,7 @@ export async function sendChatMessageStream(
 
   const agentResponse = await fetch(agentUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: agentHeaders(),
     body: JSON.stringify({
       url: scan.url,
       score: scan.accessibility_score || 0,

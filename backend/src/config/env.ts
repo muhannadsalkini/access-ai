@@ -11,6 +11,9 @@ export const env = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "",
   agentServiceUrl: process.env.AGENT_SERVICE_URL || "http://localhost:8000",
+  // Shared secret sent to the agent service in the X-Internal-Secret header.
+  // Must match INTERNAL_SECRET in the agent's environment.
+  agentInternalSecret: process.env.AGENT_INTERNAL_SECRET || "",
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
   extensionOrigin: process.env.EXTENSION_ORIGIN || "",
   nodeEnv: process.env.NODE_ENV || "development",

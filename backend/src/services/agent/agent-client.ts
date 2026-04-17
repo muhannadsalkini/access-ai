@@ -81,7 +81,12 @@ export async function callAgent(request: AgentRequest): Promise<AgentResponse> {
   return withAgentRetry("callAgent", async () => {
     const response = await fetch(agentUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(env.agentInternalSecret
+          ? { "X-Internal-Secret": env.agentInternalSecret }
+          : {}),
+      },
       body: JSON.stringify({
         url: request.url,
         scan_id: request.scanId,
@@ -143,7 +148,12 @@ export async function callAgentChat(
   return withAgentRetry("callAgentChat", async () => {
     const response = await fetch(agentUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(env.agentInternalSecret
+          ? { "X-Internal-Secret": env.agentInternalSecret }
+          : {}),
+      },
       body: JSON.stringify({
         url: request.url,
         score: request.score,

@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # Backend service
     backend_service_url: str = "http://localhost:3001"
 
+    # Shared secret used to authenticate requests from the backend.
+    # Must match AGENT_INTERNAL_SECRET in the backend's environment.
+    internal_secret: str = ""
+
     # Server
     port: int = 8000
 
