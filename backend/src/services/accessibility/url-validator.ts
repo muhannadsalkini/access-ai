@@ -11,14 +11,18 @@ const BLOCKED_IP_RANGES = [
   /^10\./,                     // Private Class A
   /^172\.(1[6-9]|2\d|3[01])\./, // Private Class B
   /^192\.168\./,               // Private Class C
-  /^169\.254\./,               // Link-local
+  /^169\.254\./,               // Link-local (AWS metadata: 169.254.169.254)
   /^0\./,                      // Current network
   /^::1$/,                     // IPv6 loopback
   /^fc00:/,                    // IPv6 unique local
   /^fe80:/,                    // IPv6 link-local
 ];
 
-function isPrivateIP(ip: string): boolean {
+/**
+ * Returns true if the IP address is in a private/reserved range.
+ * Exported so axe-scanner can reuse it in the DNS-rebinding guard.
+ */
+export function isPrivateIP(ip: string): boolean {
   return BLOCKED_IP_RANGES.some((pattern) => pattern.test(ip));
 }
 

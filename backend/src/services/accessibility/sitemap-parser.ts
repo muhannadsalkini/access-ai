@@ -1,5 +1,6 @@
 import { AppError } from "../../middleware/error-handler";
 import { logger } from "../../utils/logger";
+import { validateUrl } from "./url-validator";
 
 const MAX_SITEMAP_URLS = 10;
 
@@ -60,14 +61,16 @@ export async function parseSitemap(sitemapUrl: string): Promise<string[]> {
   if (xml.includes("<sitemapindex")) {
     const childSitemaps = extractTagContent(xml, "sitemap", "loc");
     if (childSitemaps.length > 0) {
-      // Parse the first child sitemap only (to stay within limits)
       logger.info(
         `Sitemap index found with ${childSitemaps.length} child sitemaps. Parsing first one.`
       );
-      try {
-        const childUrls = await parseSitemap(childSitemaps[0]);
+      try {// Child sitemap URLs come from untrusted XML content and must be
+        // validated against the SSRF block-list before we fetch them.
+        const validatedChildUrl = await validateUrl(childSitemaps[0]);
+        const childUrls = await parseSitemap(validatedChildUrl);
         return childUrls.slice(0, MAX_SITEMAP_URLS);
-      } catch {
+      } catch (err) {
+        if (err instanceof AppError) throw err;
         throw new AppError(
           "Could not parse child sitemaps from the sitemap index.",
           400
@@ -77,13 +80,23 @@ export async function parseSitemap(sitemapUrl: string): Promise<string[]> {
   }
 
   // Regular sitemap — extract <loc> URLs from <url> entries
+  // Each <loc> URL is read from untrusted XML and must be validated against
+  // the SSRF block-list before it is queued for scanning.  Invalid/internal
+  // URLs are silently skipped so a single bad entry doesn't abort the scan.
   const locMatches = xml.match(/<loc>\s*(.*?)\s*<\/loc>/gi);
   if (locMatches) {
     for (const match of locMatches) {
-      const url = match.replace(/<\/?loc>/gi, "").trim();
-      if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
-        urls.push(url);
+      const rawUrl = match.replace(/<\/?loc>/gi, "").trim();
+      if (!rawUrl) continue;
+
+      try {
+        const validatedUrl = await validateUrl(rawUrl);
+        urls.push(validatedUrl);
+      } catch {
+        // Skip URLs that fail validation (internal IPs, bad format, etc.)
+        logger.warn(`Skipping sitemap URL that failed validation: ${rawUrl}`);
       }
+
       if (urls.length >= MAX_SITEMAP_URLS) break;
     }
   }
