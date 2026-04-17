@@ -13,15 +13,33 @@ Works with **Cursor**, **Cline**, **Claude Code**, **Windsurf**, and any MCP-com
 
 This MCP server lets developer agents scan websites for WCAG accessibility issues, get AI-powered fix recommendations, view scan history, and ask follow-up questions — all without leaving your editor.
 
+## Guest Mode vs. Authenticated Mode
+
+> **New in v1.2.0** — No API key? No problem!
+
+| Tool | Without API key | With API key |
+|------|-----------------|--------------|
+| `scan_url` | ✅ Works — results **not** saved to history | ✅ Works — results saved |
+| `scan_code` | ✅ Works — results **not** saved to history | ✅ Works — results saved |
+| `get_scan_history` | ❌ Requires API key | ✅ Works |
+| `get_scan_report` | ❌ Requires API key | ✅ Works |
+| `chat_about_scan` | ❌ Requires API key | ✅ Works |
+
+**TL;DR:**
+- **No API key** → You can scan URLs and HTML code right away. Results are returned inline but not stored — perfect for a quick check or trying out the tool.
+- **With API key** → Full experience: results are saved to your account, you can view history, pull detailed reports, and have an AI conversation about the findings.
+
+Get a free API key at [access-ai.solutions](https://access-ai.solutions) → Settings → API Keys.
+
 ### Tools
 
 | Tool | Description |
 |------|-------------|
 | `scan_url` | Scan a website URL for WCAG accessibility issues with AI analysis |
 | `scan_code` | Scan raw HTML code directly for accessibility issues (no URL needed) |
-| `get_scan_history` | View your past accessibility scan history |
-| `get_scan_report` | Get the full detailed report for a specific scan |
-| `chat_about_scan` | Ask the AI follow-up questions about scan results |
+| `get_scan_history` | View your past accessibility scan history *(API key required)* |
+| `get_scan_report` | Get the full detailed report for a specific scan *(API key required)* |
+| `chat_about_scan` | Ask the AI follow-up questions about scan results *(API key required)* |
 
 ### Resources
 
@@ -32,19 +50,39 @@ This MCP server lets developer agents scan websites for WCAG accessibility issue
 ## Prerequisites
 
 - **Node.js 18+**
-- An **AccessAI account** (sign up at [access-ai.solutions](https://access-ai.solutions))
-- An **API key** (generate one from your AccessAI dashboard → Settings → API Keys)
+- An **AccessAI API key** is **optional** for quick scans, but **required** to save results, view history, and use AI chat.
+  - Sign up at [access-ai.solutions](https://access-ai.solutions)
+  - Generate a key from **Settings → API Keys** (starts with `ak_live_...`)
 
 ## Quick Setup
 
-### Step 1: Generate an API Key
+### Option A: Guest mode (no API key needed)
+
+Just add the MCP server — no key required. You can start scanning URLs and HTML code immediately:
+
+```json
+{
+  "mcpServers": {
+    "accessai": {
+      "command": "npx",
+      "args": ["-y", "accessai-mcp"]
+    }
+  }
+}
+```
+
+> Scan results will be returned directly in the chat but **not saved** to your account history.
+
+### Option B: Authenticated mode (full experience)
+
+#### Step 1: Generate an API Key
 
 1. Log in to your [AccessAI dashboard](https://access-ai.solutions)
 2. Go to **Settings → API Keys**
 3. Click **"Generate New Key"**
 4. Copy the key (it starts with `ak_live_...`) — it's only shown once!
 
-### Step 2: Configure your IDE
+#### Step 2: Configure your IDE
 
 Add this to your IDE's MCP configuration:
 
@@ -122,8 +160,8 @@ Then configure your IDE to use the built file:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ACCESSAI_API_KEY` | ✅ | Your AccessAI API key (starts with `ak_live_`) |
-| `ACCESSAI_BACKEND_URL` | ❌ | Custom backend URL (defaults to production) |
+| `ACCESSAI_API_KEY` | ❌ optional | Your AccessAI API key (starts with `ak_live_`). Required only for `get_scan_history`, `get_scan_report`, and `chat_about_scan`. `scan_url` and `scan_code` work without it (guest mode). |
+| `ACCESSAI_BACKEND_URL` | ❌ optional | Custom backend URL (defaults to production). |
 
 ## Usage Examples
 
