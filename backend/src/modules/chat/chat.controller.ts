@@ -3,7 +3,8 @@ import { getChatMessages, sendChatMessage, sendChatMessageStream, clearChatMessa
 import { logger } from "../../utils/logger";
 
 /**
- * GET /api/scans/:scanId/chat — Get all chat messages for a scan
+ * GET /api/scans/:scanId/chat — Get all chat messages for a scan.
+ * Only returns messages if the authenticated user owns the scan.
  */
 export async function getMessages(
   req: Request,
@@ -12,7 +13,8 @@ export async function getMessages(
 ): Promise<void> {
   try {
     const scanId = req.params.scanId as string;
-    const messages = await getChatMessages(scanId);
+    const userId = (req as any).userId as string;
+    const messages = await getChatMessages(scanId, userId);
     res.json({ success: true, data: messages });
   } catch (error: any) {
     logger.error("Get chat messages error:", error);
@@ -21,7 +23,8 @@ export async function getMessages(
 }
 
 /**
- * POST /api/scans/:scanId/chat — Send a message and get AI response
+ * POST /api/scans/:scanId/chat — Send a message and get AI response.
+ * Verifies scan ownership before processing.
  */
 export async function sendMessage(
   req: Request,
@@ -30,6 +33,7 @@ export async function sendMessage(
 ): Promise<void> {
   try {
     const scanId = req.params.scanId as string;
+    const userId = (req as any).userId as string;
     const { message } = req.body;
 
     if (!message || typeof message !== "string" || message.trim().length === 0) {
@@ -42,7 +46,7 @@ export async function sendMessage(
       return;
     }
 
-    const result = await sendChatMessage(scanId, message.trim());
+    const result = await sendChatMessage(scanId, message.trim(), userId);
     res.json({ success: true, data: result });
   } catch (error: any) {
     logger.error("Send chat message error:", error);
@@ -51,7 +55,8 @@ export async function sendMessage(
 }
 
 /**
- * DELETE /api/scans/:scanId/chat — Clear all chat messages for a scan
+ * DELETE /api/scans/:scanId/chat — Clear all chat messages for a scan.
+ * Verifies scan ownership before deleting.
  */
 export async function clearMessages(
   req: Request,
@@ -60,7 +65,8 @@ export async function clearMessages(
 ): Promise<void> {
   try {
     const scanId = req.params.scanId as string;
-    await clearChatMessages(scanId);
+    const userId = (req as any).userId as string;
+    await clearChatMessages(scanId, userId);
     res.json({ success: true });
   } catch (error: any) {
     logger.error("Clear chat messages error:", error);
@@ -69,7 +75,8 @@ export async function clearMessages(
 }
 
 /**
- * POST /api/scans/:scanId/chat/stream — Send a message and stream AI response via SSE
+ * POST /api/scans/:scanId/chat/stream — Send a message and stream AI response via SSE.
+ * Verifies scan ownership before streaming.
  */
 export async function sendMessageStream(
   req: Request,
@@ -78,6 +85,7 @@ export async function sendMessageStream(
 ): Promise<void> {
   try {
     const scanId = req.params.scanId as string;
+    const userId = (req as any).userId as string;
     const { message } = req.body;
 
     if (!message || typeof message !== "string" || message.trim().length === 0) {
@@ -102,7 +110,7 @@ export async function sendMessageStream(
 
     res.flushHeaders();
 
-    await sendChatMessageStream(scanId, message.trim(), res);
+    await sendChatMessageStream(scanId, message.trim(), res, userId);
   } catch (error: any) {
     logger.error("Stream chat message error:", error);
     // If headers already sent, send error as SSE event

@@ -15,9 +15,29 @@ function agentHeaders(): Record<string, string> {
 }
 
 /**
- * Get all chat messages for a scan.
+ * Verify that a scan exists and is owned by the given user.
+ * Throws a 404-style error if not found or not owned.
  */
-export async function getChatMessages(scanId: string): Promise<ChatMessage[]> {
+async function assertScanOwnership(scanId: string, userId: string): Promise<void> {
+  const { data: scan, error } = await supabase
+    .from("scans")
+    .select("id")
+    .eq("id", scanId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !scan) {
+    throw Object.assign(new Error("Scan not found"), { statusCode: 404 });
+  }
+}
+
+/**
+ * Get all chat messages for a scan.
+ * Verifies that the requesting user owns the scan before returning data.
+ */
+export async function getChatMessages(scanId: string, userId: string): Promise<ChatMessage[]> {
+  await assertScanOwnership(scanId, userId);
+
   const { data, error } = await supabase
     .from("chat_messages")
     .select("*")
@@ -34,8 +54,11 @@ export async function getChatMessages(scanId: string): Promise<ChatMessage[]> {
 
 /**
  * Delete all chat messages for a scan.
+ * Verifies that the requesting user owns the scan before deleting.
  */
-export async function clearChatMessages(scanId: string): Promise<void> {
+export async function clearChatMessages(scanId: string, userId: string): Promise<void> {
+  await assertScanOwnership(scanId, userId);
+
   const { error } = await supabase
     .from("chat_messages")
     .delete()
@@ -49,20 +72,23 @@ export async function clearChatMessages(scanId: string): Promise<void> {
 
 /**
  * Send a chat message and get a response from the AI agent.
+ * Verifies that the requesting user owns the scan before proceeding.
  */
 export async function sendChatMessage(
   scanId: string,
-  userMessage: string
+  userMessage: string,
+  userId: string
 ): Promise<SendChatResponse> {
-  // 1. Fetch scan data for context
+  // 1. Fetch scan data for context — ownership verified via user_id filter
   const { data: scan, error: scanError } = await supabase
     .from("scans")
     .select("*")
     .eq("id", scanId)
+    .eq("user_id", userId)
     .single();
 
   if (scanError || !scan) {
-    throw new Error("Scan not found");
+    throw Object.assign(new Error("Scan not found"), { statusCode: 404 });
   }
 
   // 2. Fetch issues for context
@@ -78,8 +104,8 @@ export async function sendChatMessage(
     .eq("scan_id", scanId)
     .single();
 
-  // 4. Fetch existing conversation history
-  const existingMessages = await getChatMessages(scanId);
+  // 4. Fetch existing conversation history (ownership already verified above)
+  const existingMessages = await getChatMessages(scanId, userId);
 
   // 5. Save user message
   const { data: savedUserMsg, error: userMsgError } = await supabase
@@ -145,22 +171,24 @@ export async function sendChatMessage(
 
 /**
  * Send a chat message and stream the AI response via SSE.
- * Saves the user message first, streams from agent, then saves full response.
+ * Verifies that the requesting user owns the scan before proceeding.
  */
 export async function sendChatMessageStream(
   scanId: string,
   userMessage: string,
-  res: Response
+  res: Response,
+  userId: string
 ): Promise<void> {
-  // 1-4: Same context gathering as non-streaming
+  // 1. Fetch scan — ownership verified via user_id filter
   const { data: scan, error: scanError } = await supabase
     .from("scans")
     .select("*")
     .eq("id", scanId)
+    .eq("user_id", userId)
     .single();
 
   if (scanError || !scan) {
-    throw new Error("Scan not found");
+    throw Object.assign(new Error("Scan not found"), { statusCode: 404 });
   }
 
   const { data: issues } = await supabase
@@ -174,7 +202,8 @@ export async function sendChatMessageStream(
     .eq("scan_id", scanId)
     .single();
 
-  const existingMessages = await getChatMessages(scanId);
+  // Ownership already verified above
+  const existingMessages = await getChatMessages(scanId, userId);
 
   // 5. Save user message
   const { data: savedUserMsg, error: userMsgError } = await supabase
