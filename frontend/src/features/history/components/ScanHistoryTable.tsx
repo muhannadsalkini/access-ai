@@ -36,7 +36,7 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
           <ClipboardList className="w-8 h-8 text-zinc-500" />
         </div>
         <h3 className="text-lg font-semibold text-white mb-2">No scans yet</h3>
-        <p className="text-zinc-500 mb-6 text-sm">
+        <p className="text-zinc-400 mb-6 text-sm">
           Start by scanning a website for accessibility issues.
         </p>
         <Link
@@ -58,19 +58,19 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/[0.06]">
-              <th className="text-left px-6 py-3.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+              <th className="text-left px-6 py-3.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                 URL
               </th>
-              <th className="text-left px-6 py-3.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+              <th className="text-left px-6 py-3.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                 Date
               </th>
-              <th className="text-center px-6 py-3.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+              <th className="text-center px-6 py-3.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                 Score
               </th>
-              <th className="text-center px-6 py-3.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+              <th className="text-center px-6 py-3.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                 Status
               </th>
-              <th className="text-right px-6 py-3.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+              <th className="text-right px-6 py-3.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                 Action
               </th>
             </tr>
@@ -101,7 +101,7 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-zinc-500">
+                <td className="px-6 py-4 text-sm text-zinc-400">
                   {new Date(scan.scan_date).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4">
@@ -160,7 +160,7 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
               <StatusBadge status={scan.status} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-zinc-500">
+              <span className="text-xs text-zinc-400">
                 {new Date(scan.scan_date).toLocaleDateString()}
               </span>
               <div className="flex items-center gap-3">
@@ -184,7 +184,7 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06]">
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-zinc-400">
             Showing {startIndex + 1}&ndash;{Math.min(startIndex + ITEMS_PER_PAGE, scans.length)} of {scans.length} scans
           </p>
           <div className="flex items-center gap-1">
