@@ -12,6 +12,9 @@ router.post("/", optionalAuth as any, scanLimiter, scanController.createScan as 
 // POST /api/scans/code — Create a new scan from raw HTML code (guest mode supported)
 router.post("/code", optionalAuth as any, scanLimiter, scanController.createCodeScan as any);
 
+// POST /api/scans/fix — Scan HTML + return AI-fixed version (guest mode supported)
+router.post("/fix", optionalAuth as any, scanLimiter, scanController.fixCode as any);
+
 // All read/chat routes require authentication
 // GET /api/scans — Get user's scan history
 router.get("/", requireAuth as any, scanController.getScans as any);

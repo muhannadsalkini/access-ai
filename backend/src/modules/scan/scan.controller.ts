@@ -109,6 +109,28 @@ export async function getScanById(
   }
 }
 
+export async function fixCode(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { html, title } = req.body;
+
+    if (!html || typeof html !== "string" || html.trim().length === 0) {
+      throw new AppError("html is required.", 400);
+    }
+
+    logger.info(`[fix] ${req.userId ? `User ${req.userId}` : "[guest]"} requested fix_code`);
+
+    const result = await scanService.fixCode(html, req.userId, title);
+
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function deleteScan(
   req: AuthenticatedRequest,
   res: Response,

@@ -448,6 +448,105 @@ export async function createCodeScan(
   }
 }
 
+export interface FixCodeResult {
+  scanId: string;
+  score: number;
+  issueCount: number;
+  fixedHtml: string;
+  saved: boolean;
+}
+
+export async function fixCode(
+  html: string,
+  userId?: string,
+  title?: string
+): Promise<FixCodeResult> {
+  if (!html || html.trim().length === 0) {
+    throw new AppError("HTML code is required.", 400);
+  }
+  if (html.length > 500_000) {
+    throw new AppError("HTML code too large (max 500KB).", 400);
+  }
+
+  const label = title ? `code://${title}` : "code://inline";
+  const scanId = uuidv4();
+
+  logger.info(`[fix] Code scan, html length: ${html.length} chars`);
+  const scanResult = await runAxeScanOnCode(html);
+  const violations = scanResult.violations;
+
+  logger.info(`[fix] ${violations.length} violations — calling agent analyze`);
+  const agentResponse = await callAgent({ url: label, scanId, violations });
+
+  const issueCount = agentResponse.issues.length;
+  const score = agentResponse.accessibilityScore;
+
+  // Build fix prompt — include original HTML in context for the agent
+  let fixedHtml = html;
+  if (issueCount > 0) {
+    const issueList = agentResponse.issues
+      .map((i, n) => `${n + 1}. [${i.severity}] ${i.issueType}: ${i.description}`)
+      .join("\n");
+
+    const { callAgentChat } = await import("../../services/agent/agent-client.js");
+    const fixResponse = await callAgentChat({
+      url: label,
+      score,
+      summary: agentResponse.summary,
+      issuesText:
+        `Original HTML:\n\`\`\`html\n${html}\n\`\`\`\n\nIssues to fix:\n${issueList}`,
+      message:
+        `Please return the complete fixed version of the HTML above with ALL ${issueCount} accessibility issues resolved. ` +
+        `Return ONLY the corrected HTML code — no explanations, no markdown code fences, just the raw fixed HTML.`,
+      conversationHistory: [],
+    });
+    fixedHtml = fixResponse.response;
+  }
+
+  // Save to DB if user is authenticated
+  let saved = false;
+  if (userId) {
+    try {
+      const scanRecord: ScanRecord = {
+        id: scanId,
+        user_id: userId,
+        url: label,
+        scan_date: new Date().toISOString(),
+        accessibility_score: score,
+        status: "completed",
+        scan_type: "code",
+      };
+      await supabaseAdmin.from("scans").insert(scanRecord);
+
+      const issues: IssueRecord[] = agentResponse.issues.map((issue) => ({
+        id: uuidv4(),
+        scan_id: scanId,
+        issue_type: issue.issueType,
+        severity: issue.severity,
+        description: issue.description,
+        recommendation: issue.recommendation,
+        wcag_reference: issue.wcagReference,
+      }));
+      if (issues.length > 0) {
+        await supabaseAdmin.from("issues").insert(issues);
+      }
+
+      const report: ReportRecord = {
+        id: uuidv4(),
+        scan_id: scanId,
+        summary: agentResponse.summary,
+        priority_recommendations: agentResponse.priorityRecommendations,
+      };
+      await supabaseAdmin.from("reports").insert(report);
+      saved = true;
+    } catch (err) {
+      logger.warn("[fix] Failed to save scan to DB:", err);
+    }
+  }
+
+  return { scanId, score, issueCount, fixedHtml, saved };
+}
+
 export async function deleteScan(
   scanId: string,
   userId: string
