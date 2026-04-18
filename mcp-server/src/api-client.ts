@@ -154,6 +154,16 @@ export class ApiClient {
   }
 
   /**
+   * Scan HTML code and return the AI-fixed version.
+   * Works in guest mode (no API key required) — results saved only when authenticated.
+   */
+  async fixCode(html: string, title?: string): Promise<{ scanId: string; score: number; issueCount: number; fixedHtml: string; saved: boolean }> {
+    return this.request<{ scanId: string; score: number; issueCount: number; fixedHtml: string; saved: boolean }>(
+      "POST", "/api/scans/fix", { html, title }, 300_000
+    );
+  }
+
+  /**
    * Get the user's scan history.
    */
   async getScans(): Promise<ScanRecord[]> {
@@ -193,5 +203,12 @@ export class ApiClient {
    */
   async getChatMessages(scanId: string): Promise<ChatMessage[]> {
     return this.request<ChatMessage[]>("GET", `/api/scans/${scanId}/chat`);
+  }
+
+  /**
+   * Delete a scan and all related data.
+   */
+  async deleteScan(scanId: string): Promise<void> {
+    await this.request<{ message: string }>("DELETE", `/api/scans/${scanId}`);
   }
 }

@@ -15,19 +15,22 @@ This MCP server lets developer agents scan websites for WCAG accessibility issue
 
 ## Guest Mode vs. Authenticated Mode
 
-> **New in v1.2.0** — No API key? No problem!
+> No API key? No problem!
 
 | Tool | Without API key | With API key |
 |------|-----------------|--------------|
 | `scan_url` | ✅ Works — results **not** saved to history | ✅ Works — results saved |
 | `scan_code` | ✅ Works — results **not** saved to history | ✅ Works — results saved |
+| `fix_code` | ✅ Works — results **not** saved to history | ✅ Works — results saved |
 | `get_scan_history` | ❌ Requires API key | ✅ Works |
 | `get_scan_report` | ❌ Requires API key | ✅ Works |
 | `chat_about_scan` | ❌ Requires API key | ✅ Works |
+| `compare_scans` | ❌ Requires API key | ✅ Works |
+| `delete_scan` | ❌ Requires API key | ✅ Works |
 
 **TL;DR:**
 - **No API key** → You can scan URLs and HTML code right away. Results are returned inline but not stored — perfect for a quick check or trying out the tool.
-- **With API key** → Full experience: results are saved to your account, you can view history, pull detailed reports, and have an AI conversation about the findings.
+- **With API key** → Full experience: results are saved to your account, you can view history, pull detailed reports, have an AI conversation about the findings, auto-fix code, compare scans, and delete old results.
 
 Get a free API key at [access-ai.solutions](https://access-ai.solutions) → Settings → API Keys.
 
@@ -37,9 +40,12 @@ Get a free API key at [access-ai.solutions](https://access-ai.solutions) → Set
 |------|-------------|
 | `scan_url` | Scan a website URL for WCAG accessibility issues with AI analysis |
 | `scan_code` | Scan raw HTML code directly for accessibility issues (no URL needed) |
+| `fix_code` | Scan HTML code and return the **fixed version** in one step *(guest mode supported)* |
 | `get_scan_history` | View your past accessibility scan history *(API key required)* |
 | `get_scan_report` | Get the full detailed report for a specific scan *(API key required)* |
 | `chat_about_scan` | Ask the AI follow-up questions about scan results *(API key required)* |
+| `compare_scans` | Compare two scans to measure accessibility improvement *(API key required)* |
+| `delete_scan` | Delete a scan and all its data from history *(API key required)* |
 
 ### Resources
 
@@ -167,12 +173,101 @@ Then configure your IDE to use the built file:
 
 Once configured, you can ask your AI agent things like:
 
+**Scanning:**
 - *"Scan https://example.com for accessibility issues"*
+- *"Scan this HTML component for WCAG issues"*
+
+**History & reports:**
 - *"Show me my recent accessibility scans"*
 - *"Get the full report for my last scan"*
+
+**AI chat:**
 - *"How do I fix the color contrast issues from the scan?"*
 - *"Which accessibility issues should I prioritize fixing?"*
-- *"Show me code examples for adding ARIA labels to fix the issues"*
+- *"Show me code examples for adding ARIA labels"*
+
+**Fix code:**
+- *"Fix all accessibility issues in this HTML file"*
+- *"Scan and auto-fix this component"*
+
+**Compare scans:**
+- *"Compare my scan from last week to today's — did I improve?"*
+- *"Show me what accessibility issues I fixed between these two scans"*
+
+**Delete:**
+- *"Delete the old test scans from my history"*
+- *"Clean up scan abc123 from my history"*
+
+## Tool Reference
+
+### `scan_url`
+Scan a live website URL for WCAG accessibility issues.
+- **Input:** `url` (string) — e.g. `https://example.com` or a sitemap URL
+- **Output:** Accessibility score, issues grouped by severity, fix recommendations
+- **API key:** Optional (results not saved in guest mode)
+
+### `scan_code`
+Scan raw HTML code directly without needing a live URL.
+- **Input:** `html` (string), `title` (optional)
+- **Output:** Accessibility score, issues, AI recommendations
+- **API key:** Optional (results not saved in guest mode)
+
+### `fix_code`
+Scan HTML code **and** return a fixed version with all issues resolved — in a single tool call.
+- **Input:** `html` (string), `title` (optional)
+- **Output:** Original score, issue count, and the complete fixed HTML code
+- **API key:** Optional (results saved only when authenticated)
+- **Ideal for:** Agents that want to write accessible code automatically
+
+```
+# Example agent prompt
+"Fix all accessibility issues in this button component:
+<button onclick='handleClick()'>Submit</button>"
+
+# Returns the fixed HTML with ARIA labels, keyboard handlers, etc.
+```
+
+### `get_scan_history`
+View past scan history.
+- **Input:** `limit` (optional, default 10)
+- **Output:** List of scans with URLs, dates, scores
+- **API key:** Required
+
+### `get_scan_report`
+Get the full detailed report for a scan.
+- **Input:** `scan_id` (UUID from `get_scan_history`)
+- **Output:** Full report with all issues, recommendations, and WCAG references
+- **API key:** Required
+
+### `chat_about_scan`
+Ask the AI assistant follow-up questions about a scan.
+- **Input:** `scan_id`, `message`
+- **Output:** AI response in markdown
+- **API key:** Required
+
+### `compare_scans`
+Compare two scans to measure improvement or detect regressions.
+- **Input:** `before_scan_id`, `after_scan_id`
+- **Output:** Score delta, fixed issue types, new regressions, remaining issues by severity
+- **API key:** Required
+- **Ideal for:** Verifying that accessibility fixes actually improved the score
+
+```
+# Example: compare before and after fixing
+compare_scans(
+  before_scan_id: "uuid-of-original-scan",
+  after_scan_id: "uuid-of-fixed-scan"
+)
+
+# Returns a table: Score 65 → 90 (+25), 3 issue types fixed, 0 regressions
+```
+
+### `delete_scan`
+Delete a scan and all its related data (issues, report, chat history).
+- **Input:** `scan_id`
+- **Output:** Success confirmation
+- **API key:** Required
+- **Note:** This action is irreversible
 
 ## Using as a Library (SDK Integration)
 

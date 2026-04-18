@@ -8,9 +8,13 @@
  *
  * Tools:
  *   - scan_url          — Scan a URL for WCAG accessibility issues
+ *   - scan_code         — Scan raw HTML code for accessibility issues
  *   - get_scan_history  — View past scan history
  *   - get_scan_report   — Get full report for a specific scan
  *   - chat_about_scan   — Ask the AI follow-up questions about a scan
+ *   - fix_code          — Scan HTML and return AI-fixed version (v1.3.0)
+ *   - compare_scans     — Compare two scans to measure improvement (v1.3.0)
+ *   - delete_scan       — Delete a scan and all related data (v1.3.0)
  *
  * Resources:
  *   - accessai://scans/latest — Latest scan report
@@ -28,6 +32,9 @@ import { handleGetScanHistory } from "./tools/get-scan-history.js";
 import { handleGetScanReport } from "./tools/get-scan-report.js";
 import { handleChatAboutScan } from "./tools/chat-about-scan.js";
 import { handleScanCode } from "./tools/scan-code.js";
+import { handleFixCode } from "./tools/fix-code.js";
+import { handleCompareScans } from "./tools/compare-scans.js";
+import { handleDeleteScan } from "./tools/delete-scan.js";
 import {
   LATEST_SCAN_RESOURCE,
   handleLatestScanResource,
@@ -47,7 +54,7 @@ const apiClient = new ApiClient(config, auth);
 
 const server = new McpServer({
   name: "accessai",
-  version: "1.1.1",
+  version: "1.3.0",
 });
 
 // ---------------------------------------------------------------------------
@@ -140,6 +147,44 @@ server.tool(
   },
   async ({ html, title }) => {
     const result = await handleScanCode(apiClient, { html, title });
+    return { content: [{ type: "text", text: result }] };
+  }
+);
+
+server.tool(
+  "fix_code",
+  "Scan raw HTML code for WCAG accessibility issues and automatically return the fixed version with all issues resolved. This combines scanning and fixing in a single step — ideal for AI agents that want to write accessible code from the start. Requires an API key. Results are saved to scan history.",
+  {
+    html: z.string().describe("The raw HTML code to scan and fix for accessibility issues."),
+    title: z.string().optional().describe("Optional label for this scan (e.g. 'LoginForm')."),
+  },
+  async ({ html, title }) => {
+    const result = await handleFixCode(apiClient, { html, title });
+    return { content: [{ type: "text", text: result }] };
+  }
+);
+
+server.tool(
+  "compare_scans",
+  "Compare two accessibility scans to see improvement or regression. Shows score change, issues fixed, and remaining issues. Use this after making fixes to verify improvement. Requires an API key.",
+  {
+    before_scan_id: z.string().describe("The scan ID of the original (before fix) scan."),
+    after_scan_id: z.string().describe("The scan ID of the updated (after fix) scan."),
+  },
+  async ({ before_scan_id, after_scan_id }) => {
+    const result = await handleCompareScans(apiClient, { before_scan_id, after_scan_id });
+    return { content: [{ type: "text", text: result }] };
+  }
+);
+
+server.tool(
+  "delete_scan",
+  "Delete a scan and all its related data (issues, report, chat history) from your scan history. This action is irreversible. Requires an API key.",
+  {
+    scan_id: z.string().describe("The UUID of the scan to delete. Use `get_scan_history` to find scan IDs."),
+  },
+  async ({ scan_id }) => {
+    const result = await handleDeleteScan(apiClient, { scan_id });
     return { content: [{ type: "text", text: result }] };
   }
 );
