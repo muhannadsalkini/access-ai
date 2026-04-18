@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Scan } from "@/shared/types";
 import ScoreBadge from "@/shared/components/ScoreBadge";
 import { cn } from "@/shared/lib/utils";
+import { deleteScan } from "@/features/history/services/history";
 import {
   ClipboardList,
   ArrowRight,
@@ -15,6 +16,7 @@ import {
   Globe,
   FileText,
   Code,
+  Trash2,
 } from "lucide-react";
 
 const ITEMS_PER_PAGE = 10;
@@ -23,11 +25,33 @@ interface ScanHistoryTableProps {
   scans: Scan[];
 }
 
-export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
+export default function ScanHistoryTable({ scans: initialScans }: ScanHistoryTableProps) {
+  const [scans, setScans] = useState<Scan[]>(initialScans);
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
   const totalPages = Math.ceil(scans.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedScans = scans.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  async function handleDelete(scanId: string) {
+    setDeletingId(scanId);
+    try {
+      await deleteScan(scanId);
+      setScans((prev) => prev.filter((s) => s.id !== scanId));
+      setConfirmId(null);
+      // If we deleted the last item on this page, go back one
+      const newTotal = Math.ceil((scans.length - 1) / ITEMS_PER_PAGE);
+      if (currentPage > newTotal && currentPage > 1) {
+        setCurrentPage((p) => p - 1);
+      }
+    } catch (err) {
+      console.error("Failed to delete scan:", err);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   if (scans.length === 0) {
     return (
@@ -119,15 +143,44 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
                   <StatusBadge status={scan.status} />
                 </td>
                 <td className="px-6 py-4 text-right">
-                  {scan.status === "completed" && (
-                    <Link
-                      href={`/history/${scan.id}`}
-                      className="group inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
-                    >
-                      View Report
-                      <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-                    </Link>
-                  )}
+                  <div className="flex items-center justify-end gap-3">
+                    {scan.status === "completed" && (
+                      <Link
+                        href={`/history/${scan.id}`}
+                        className="group inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+                      >
+                        View Report
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                      </Link>
+                    )}
+                    {/* Delete */}
+                    {confirmId === scan.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleDelete(scan.id)}
+                          disabled={deletingId === scan.id}
+                          className="text-xs text-red-400 hover:text-red-300 font-medium disabled:opacity-50"
+                        >
+                          {deletingId === scan.id ? "Deleting…" : "Confirm"}
+                        </button>
+                        <span className="text-zinc-700">|</span>
+                        <button
+                          onClick={() => setConfirmId(null)}
+                          className="text-xs text-zinc-500 hover:text-zinc-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmId(scan.id)}
+                        className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        aria-label="Delete scan"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -174,6 +227,32 @@ export default function ScanHistoryTable({ scans }: ScanHistoryTableProps) {
                       View
                     </Link>
                   </>
+                )}
+                {/* Mobile delete */}
+                {confirmId === scan.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleDelete(scan.id)}
+                      disabled={deletingId === scan.id}
+                      className="text-xs text-red-400 font-medium disabled:opacity-50"
+                    >
+                      {deletingId === scan.id ? "…" : "Delete"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmId(null)}
+                      className="text-xs text-zinc-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmId(scan.id)}
+                    className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    aria-label="Delete scan"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 )}
               </div>
             </div>

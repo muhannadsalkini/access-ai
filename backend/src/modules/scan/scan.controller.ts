@@ -108,3 +108,23 @@ export async function getScanById(
     next(err);
   }
 }
+
+export async function deleteScan(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const id = req.params.id as string;
+
+    if (!id) {
+      throw new AppError("Scan ID is required.", 400);
+    }
+
+    await scanService.deleteScan(id, req.userId);
+
+    res.json({ success: true, data: { message: "Scan deleted successfully." } });
+  } catch (err) {
+    next(err);
+  }
+}

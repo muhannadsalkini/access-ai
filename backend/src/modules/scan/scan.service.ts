@@ -448,6 +448,46 @@ export async function createCodeScan(
   }
 }
 
+export async function deleteScan(
+  scanId: string,
+  userId: string
+): Promise<void> {
+  // Verify ownership before deleting
+  const { data: scan, error: fetchError } = await supabaseAdmin
+    .from("scans")
+    .select("id")
+    .eq("id", scanId)
+    .eq("user_id", userId)
+    .single();
+
+  if (fetchError || !scan) {
+    throw new AppError("Scan not found.", 404);
+  }
+
+  // Delete related records first (cascade)
+  await supabaseAdmin.from("issues").delete().eq("scan_id", scanId);
+  await supabaseAdmin.from("reports").delete().eq("scan_id", scanId);
+
+  // Delete chat messages (silently ignore if table doesn't exist)
+  try {
+    await supabaseAdmin.from("chat_messages").delete().eq("scan_id", scanId);
+  } catch {
+    // ignore
+  }
+
+  // Delete the scan itself
+  const { error } = await supabaseAdmin
+    .from("scans")
+    .delete()
+    .eq("id", scanId)
+    .eq("user_id", userId);
+
+  if (error) {
+    logger.error("Failed to delete scan:", error);
+    throw new AppError("Failed to delete scan.", 500);
+  }
+}
+
 async function updateScanStatus(
   scanId: string,
   status: ScanRecord["status"]

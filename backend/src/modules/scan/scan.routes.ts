@@ -19,6 +19,9 @@ router.get("/", requireAuth as any, scanController.getScans as any);
 // GET /api/scans/:id — Get a specific scan with issues and report
 router.get("/:id", requireAuth as any, scanController.getScanById as any);
 
+// DELETE /api/scans/:id — Delete a scan and all related data
+router.delete("/:id", requireAuth as any, scanController.deleteScan as any);
+
 // GET /api/scans/:scanId/chat — Get chat messages for a scan
 router.get("/:scanId/chat", requireAuth as any, chatController.getMessages as any);
 

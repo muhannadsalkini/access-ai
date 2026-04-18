@@ -13,6 +13,16 @@ export async function getScanHistory(): Promise<Scan[]> {
   return response.data;
 }
 
+export async function deleteScan(scanId: string): Promise<void> {
+  const token = await getAccessToken();
+  if (!token) throw new Error("Not authenticated");
+
+  await api<ApiResponse<{ message: string }>>(`/api/scans/${scanId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export async function getScanDetail(scanId: string): Promise<ScanResult> {
   const token = await getAccessToken();
   if (!token) throw new Error("Not authenticated");
