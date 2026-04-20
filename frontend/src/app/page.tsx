@@ -7,8 +7,9 @@ import type { User } from "@supabase/supabase-js";
 import URLInput from "@/features/scan/components/URLInput";
 import ScanProgress from "@/features/scan/components/ScanProgress";
 import ReportView from "@/features/scan/components/ReportView";
-import { createScan } from "@/features/scan/services/scan";
-import type { ScanResult } from "@/shared/types";
+import { streamScan } from "@/features/scan/services/scan";
+import type { Issue, Scan, ScanResult } from "@/shared/types";
+
 import {
   Search,
   Sparkles,
@@ -23,7 +24,6 @@ import {
   AlertCircle,
   RefreshCw,
   ArrowLeft,
-  ServerCrash,
   Terminal,
   MessageSquare,
   History,
@@ -37,9 +37,18 @@ export default function HomePage() {
 
   // Scan state
   const [scanLoading, setScanLoading] = useState(false);
-  const [wakingUp, setWakingUp] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState("");
+
+  // Live progress from the streaming scan endpoint
+  const [progressStage, setProgressStage] = useState<
+    "scanning" | "analyzing" | "idle"
+  >("idle");
+  const [progressMessage, setProgressMessage] = useState<string>("");
+  const [progressPages, setProgressPages] = useState<
+    { scanned: number; total: number } | null
+  >(null);
+  const [liveIssueCount, setLiveIssueCount] = useState(0);
 
   useEffect(() => {
     const getUser = async () => {
@@ -62,27 +71,115 @@ export default function HomePage() {
 
   const handleScan = async (url: string) => {
     setScanLoading(true);
-    setWakingUp(false);
     setResult(null);
     setError("");
+    setProgressStage("scanning");
+    setProgressMessage("Preparing scan…");
+    setProgressPages(null);
+    setLiveIssueCount(0);
+
+    // Accumulate results in local variables while streaming.
+    // setResult is called ONCE after the stream fully completes so that React
+    // always batches it with setScanLoading(false) — preventing any flash of
+    // "No accessibility issues detected!" with an empty list.
+    let partialScan: Scan | null = null;
+    let finalScan: Scan | null = null;
+    const partialIssues: Issue[] = [];
+    let partialSummary = "";
+    let partialPriority = "";
+
+    const buildResult = (): ScanResult | null => {
+      const scan = finalScan ?? partialScan;
+      if (!scan) return null;
+      const report =
+        partialSummary || partialPriority
+          ? {
+              id: `partial-${scan.id}`,
+              scan_id: scan.id,
+              summary: partialSummary,
+              priority_recommendations: partialPriority,
+            }
+          : null;
+      return { scan, issues: [...partialIssues], report };
+    };
+
     try {
-      const scanResult = await createScan(url, () => setWakingUp(true));
-      setResult(scanResult);
+      await streamScan(url, {
+        onEvent: (evt) => {
+          switch (evt.type) {
+            case "scan":
+              partialScan = evt.scan;
+              break;
+            case "status":
+              if (evt.status === "scanning" || evt.status === "analyzing") {
+                setProgressStage(evt.status);
+              }
+              break;
+            case "progress":
+              setProgressMessage(evt.message);
+              if (
+                typeof evt.pagesScanned === "number" &&
+                typeof evt.pagesTotal === "number"
+              ) {
+                setProgressPages({
+                  scanned: evt.pagesScanned,
+                  total: evt.pagesTotal,
+                });
+              }
+              break;
+            case "violations_found":
+              if (partialScan) {
+                partialScan = {
+                  ...partialScan,
+                  accessibility_score: evt.score,
+                };
+              }
+              break;
+            case "summary":
+              partialSummary = evt.summary;
+              partialPriority = evt.priority_recommendations;
+              break;
+            case "issue":
+              partialIssues.push(evt.issue);
+              setLiveIssueCount(partialIssues.length);
+              break;
+            case "done":
+              // Record the final scan object — do NOT call setResult yet.
+              // We call it once, synchronously, right before setScanLoading(false)
+              // so React batches both into a single render (no empty-list flash).
+              finalScan = evt.scan;
+              break;
+            case "error":
+              throw new Error(evt.message);
+          }
+        },
+      });
+
+      // Stream fully drained — set the result with everything accumulated.
+      // This runs synchronously before the finally block so React can batch
+      // setResult + setScanLoading(false) into one render.
+      setResult(buildResult());
     } catch (err: any) {
-      setError(err.message || "Scan failed. Please try again.");
+      setError(err?.message || "Scan failed. Please try again.");
+      setResult(null);
     } finally {
       setScanLoading(false);
-      setWakingUp(false);
+      setProgressStage("idle");
     }
   };
 
   const handleReset = () => {
     setResult(null);
     setError("");
+    setProgressStage("idle");
+    setProgressMessage("");
+    setProgressPages(null);
+    setLiveIssueCount(0);
   };
 
-  // If we have results, show full-screen results view
-  if (result) {
+  // Only show results once scanning is fully complete (avoids flash of
+  // "No accessibility issues detected!" while issues are still streaming).
+  if (result && !scanLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-8">
@@ -111,7 +208,6 @@ export default function HomePage() {
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse-glow" />
           <div className="absolute bottom-0 left-1/4 w-[400px] h-[400px] bg-violet-500/8 rounded-full blur-[100px]" />
           <div className="absolute top-1/3 right-1/4 w-[300px] h-[300px] bg-blue-500/5 rounded-full blur-[80px]" />
-          {/* Grid pattern */}
           <div
             className="absolute inset-0 opacity-[0.015]"
             style={{
@@ -152,38 +248,13 @@ export default function HomePage() {
                     <URLInput onSubmit={handleScan} loading={scanLoading} />
                   )}
 
-                  {scanLoading && !wakingUp && <ScanProgress />}
-
-                  {scanLoading && wakingUp && (
-                    <div className="flex flex-col items-center gap-4 py-10 text-center animate-fade-in">
-                      <div className="relative">
-                        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                          <ServerCrash className="w-7 h-7 text-amber-400" />
-                        </div>
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-500/30 border border-amber-500/50 flex items-center justify-center">
-                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-amber-300 mb-1">
-                          Waking up servers...
-                        </p>
-                        <p className="text-xs text-zinc-500 max-w-xs">
-                          The service is starting up after being idle. This
-                          takes up to 60 seconds — your scan will continue
-                          automatically.
-                        </p>
-                      </div>
-                      <div className="flex gap-1.5 mt-1">
-                        {[0, 1, 2].map((i) => (
-                          <div
-                            key={i}
-                            className="w-1.5 h-1.5 rounded-full bg-amber-500/60 animate-bounce"
-                            style={{ animationDelay: `${i * 150}ms` }}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                  {scanLoading && (
+                    <ScanProgress
+                      stage={progressStage}
+                      message={progressMessage}
+                      pages={progressPages}
+                      issueCount={liveIssueCount}
+                    />
                   )}
 
                   {error && (
@@ -356,9 +427,10 @@ export default function HomePage() {
               </h2>
 
               <p className="text-zinc-400 mb-8 leading-relaxed">
-                Use the AccessAI MCP server with Cursor, Cline, Claude Code, Windsurf, or
-                any MCP-compatible AI agent. Scan websites, get reports, and ask
-                follow-up questions — all without leaving your editor.
+                Use the AccessAI MCP server with Cursor, Cline, Claude Code,
+                Windsurf, or any MCP-compatible AI agent. Scan websites, get
+                reports, and ask follow-up questions — all without leaving your
+                editor.
               </p>
 
               <div className="space-y-4 mb-8">
@@ -428,7 +500,9 @@ export default function HomePage() {
                 {/* Code content */}
                 <pre className="p-5 text-sm leading-relaxed overflow-x-auto">
                   <code>
-                    <span className="text-zinc-500">{"// Add to your IDE's MCP config\n"}</span>
+                    <span className="text-zinc-500">
+                      {"// Add to your IDE's MCP config\n"}
+                    </span>
                     <span className="text-zinc-300">{"{\n"}</span>
                     <span className="text-zinc-300">{"  "}</span>
                     <span className="text-indigo-300">{'"mcpServers"'}</span>
@@ -452,7 +526,9 @@ export default function HomePage() {
                     <span className="text-emerald-300">{'"env"'}</span>
                     <span className="text-zinc-300">{": {\n"}</span>
                     <span className="text-zinc-300">{"        "}</span>
-                    <span className="text-emerald-300">{'"ACCESSAI_API_KEY"'}</span>
+                    <span className="text-emerald-300">
+                      {'"ACCESSAI_API_KEY"'}
+                    </span>
                     <span className="text-zinc-300">{": "}</span>
                     <span className="text-amber-300">{'"ak_live_..."'}</span>
                     <span className="text-zinc-300">{"\n"}</span>
@@ -466,16 +542,21 @@ export default function HomePage() {
 
               {/* IDE badges */}
               <div className="flex flex-wrap justify-center gap-2 mt-6">
-                {["Cursor", "Cline", "Claude Code", "Windsurf", "Vercel AI SDK", "OpenAI SDK"].map(
-                  (name) => (
-                    <span
-                      key={name}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border border-white/[0.08] bg-white/[0.03] text-zinc-400"
-                    >
-                      {name}
-                    </span>
-                  )
-                )}
+                {[
+                  "Cursor",
+                  "Cline",
+                  "Claude Code",
+                  "Windsurf",
+                  "Vercel AI SDK",
+                  "OpenAI SDK",
+                ].map((name) => (
+                  <span
+                    key={name}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border border-white/[0.08] bg-white/[0.03] text-zinc-400"
+                  >
+                    {name}
+                  </span>
+                ))}
               </div>
             </div>
           </div>

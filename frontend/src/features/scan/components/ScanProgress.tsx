@@ -21,9 +21,28 @@ const stages = [
     color: "text-violet-400",
     bgColor: "bg-violet-500/10 border-violet-500/20",
   },
-];
+] as const;
 
-export default function ScanProgress() {
+interface ScanProgressProps {
+  /**
+   * Current pipeline stage.  When omitted the component falls back to its
+   * pre-streaming behavior (auto-advances "scanning" → "analyzing" after 8s).
+   */
+  stage?: "scanning" | "analyzing" | "idle";
+  /** Free-form progress message to display under the stage title. */
+  message?: string;
+  /** Progress for sitemap scans (how many of N pages done). */
+  pages?: { scanned: number; total: number } | null;
+  /** Number of enriched issues streamed so far. */
+  issueCount?: number;
+}
+
+export default function ScanProgress({
+  stage,
+  message,
+  pages,
+  issueCount,
+}: ScanProgressProps = {}) {
   const [currentStage, setCurrentStage] = useState(0);
   const [dots, setDots] = useState("");
   const [elapsed, setElapsed] = useState(0);
@@ -37,15 +56,23 @@ export default function ScanProgress() {
       setElapsed((prev) => prev + 1);
     }, 1000);
 
-    // Move to "Analyzing" stage after 8 seconds
-    const timer1 = setTimeout(() => setCurrentStage(1), 8000);
+    // Fallback timer — only used when the caller does NOT drive `stage`.
+    const timer1 = setTimeout(() => {
+      if (stage === undefined) setCurrentStage(1);
+    }, 8000);
 
     return () => {
       clearInterval(dotsInterval);
       clearInterval(elapsedInterval);
       clearTimeout(timer1);
     };
-  }, []);
+  }, [stage]);
+
+  // When the parent tells us the stage, follow it.
+  useEffect(() => {
+    if (stage === "scanning") setCurrentStage(0);
+    else if (stage === "analyzing") setCurrentStage(1);
+  }, [stage]);
 
   const formatElapsed = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -55,6 +82,8 @@ export default function ScanProgress() {
   };
 
   const CurrentIcon = stages[currentStage].icon;
+
+  const description = message || stages[currentStage].description;
 
   return (
     <div className="w-full max-w-md mx-auto py-12 animate-fade-in">
@@ -87,9 +116,39 @@ export default function ScanProgress() {
           {stages[currentStage].label}
           <span className="text-zinc-500">{dots}</span>
         </h3>
-        <p className="text-sm text-zinc-400 mt-2">
-          {stages[currentStage].description}
+        <p className="text-sm text-zinc-400 mt-2 min-h-[1.25rem]">
+          {description}
         </p>
+
+        {/* Sitemap page progress */}
+        {pages && pages.total > 0 && (
+          <div className="mt-4 max-w-[240px] mx-auto">
+            <div className="flex items-center justify-between text-xs text-zinc-500 mb-1.5">
+              <span>
+                Pages: {pages.scanned}/{pages.total}
+              </span>
+              <span>
+                {Math.round((pages.scanned / pages.total) * 100)}%
+              </span>
+            </div>
+            <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full bg-blue-500/70 transition-all duration-300"
+                style={{
+                  width: `${(pages.scanned / pages.total) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Live issue counter (during AI streaming) */}
+        {typeof issueCount === "number" && issueCount > 0 && (
+          <p className="text-xs text-violet-300 mt-3">
+            {issueCount} issue{issueCount === 1 ? "" : "s"} enriched so far…
+          </p>
+        )}
+
         <p className="text-xs text-zinc-600 mt-3">
           Elapsed: {formatElapsed(elapsed)}
         </p>
@@ -97,15 +156,15 @@ export default function ScanProgress() {
 
       {/* Progress steps */}
       <div className="space-y-3">
-        {stages.map((stage, index) => {
-          const StageIcon = stage.icon;
+        {stages.map((s, index) => {
+          const StageIcon = s.icon;
           const isCompleted = index < currentStage;
           const isActive = index === currentStage;
           const isPending = index > currentStage;
 
           return (
             <div
-              key={stage.key}
+              key={s.key}
               className={cn(
                 "flex items-center gap-4 px-4 py-3 rounded-xl border transition-all duration-500",
                 isCompleted && "bg-emerald-500/5 border-emerald-500/10",
@@ -117,7 +176,7 @@ export default function ScanProgress() {
                 className={cn(
                   "w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 transition-all duration-500",
                   isCompleted && "bg-emerald-500/10 border-emerald-500/20",
-                  isActive && stage.bgColor,
+                  isActive && s.bgColor,
                   isPending && "bg-white/5 border-white/10"
                 )}
               >
@@ -127,7 +186,7 @@ export default function ScanProgress() {
                   <StageIcon
                     className={cn(
                       "w-4 h-4",
-                      isActive ? stage.color : "text-zinc-600"
+                      isActive ? s.color : "text-zinc-600"
                     )}
                   />
                 )}
@@ -141,7 +200,7 @@ export default function ScanProgress() {
                     isPending && "text-zinc-600"
                   )}
                 >
-                  {stage.label}
+                  {s.label}
                 </span>
               </div>
               {isActive && (
