@@ -10,9 +10,16 @@ from google import genai
 from google.genai import types
 
 from app.config import get_settings
-from app.agent.prompts import SYSTEM_INSTRUCTION, ANALYSIS_PROMPT_TEMPLATE, CHAT_SYSTEM_INSTRUCTION, CHAT_PROMPT_TEMPLATE
+from app.agent.prompts import (
+    SYSTEM_INSTRUCTION,
+    ANALYSIS_PROMPT_TEMPLATE,
+    STREAM_ANALYSIS_PROMPT_TEMPLATE,
+    CHAT_SYSTEM_INSTRUCTION,
+    CHAT_PROMPT_TEMPLATE,
+)
 from app.schemas.requests import AnalyzeRequest, ChatRequest
 from app.schemas.responses import AnalyzeResponse, AnalyzedIssue, ChatResponse
+
 
 
 def _format_violations(violations) -> str:
@@ -239,3 +246,95 @@ async def chat_about_scan_stream(request: ChatRequest) -> AsyncGenerator[str, No
         if isinstance(item, Exception):
             raise item
         yield item
+
+
+# ---------------------------------------------------------------------------
+# Streaming analyze — yields NDJSON records (one JSON object per line)
+# ---------------------------------------------------------------------------
+
+
+async def analyze_accessibility_stream(
+    request: AnalyzeRequest,
+) -> AsyncGenerator[str, None]:
+    """
+    Run the AI agent in streaming mode.
+
+    Prompts Gemini to emit NDJSON (one JSON record per line) and yields each
+    complete line as soon as it arrives.  The caller (the FastAPI route) is
+    responsible for forwarding those lines to its client.
+
+    The first line is a "summary" record, followed by one "issue" record per
+    violation.  Scoring is done deterministically by the backend, not the LLM.
+    """
+    settings = get_settings()
+    client = genai.Client(api_key=settings.google_api_key)
+
+    violations_text = _format_violations(request.violations)
+
+    prompt = STREAM_ANALYSIS_PROMPT_TEMPLATE.format(
+        url=request.url,
+        violation_count=len(request.violations),
+        violations_text=violations_text,
+    )
+
+    # Bridge the sync Gemini streaming API → async via a thread-safe queue.
+    chunk_queue: queue.Queue = queue.Queue()
+    _SENTINEL = object()
+
+    def _run_sync_stream():
+        try:
+            response = client.models.generate_content_stream(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_INSTRUCTION,
+                    temperature=0.2,
+                ),
+            )
+            for chunk in response:
+                if chunk.text:
+                    chunk_queue.put(chunk.text)
+        except Exception as e:
+            chunk_queue.put(e)
+        finally:
+            chunk_queue.put(_SENTINEL)
+
+    thread = threading.Thread(target=_run_sync_stream, daemon=True)
+    thread.start()
+
+    # Buffer partial chunks and emit one full line at a time.
+    loop = asyncio.get_event_loop()
+    buffer = ""
+    while True:
+        item = await loop.run_in_executor(None, chunk_queue.get)
+        if item is _SENTINEL:
+            break
+        if isinstance(item, Exception):
+            raise item
+
+        buffer += item
+        # Split on newline, keep last partial line in the buffer.
+        while "\n" in buffer:
+            line, buffer = buffer.split("\n", 1)
+            line = line.strip()
+            # Strip stray markdown code-fence artefacts if the model sneaks them in.
+            if line.startswith("```"):
+                continue
+            if not line:
+                continue
+            # Validate it's JSON; drop non-JSON lines rather than crashing.
+            try:
+                json.loads(line)
+            except Exception:
+                continue
+            yield line
+
+    # Flush any trailing line that didn't end with \n.
+    tail = buffer.strip()
+    if tail and not tail.startswith("```"):
+        try:
+            json.loads(tail)
+            yield tail
+        except Exception:
+            pass
+

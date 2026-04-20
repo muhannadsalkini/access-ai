@@ -5,9 +5,15 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from app.schemas.requests import AnalyzeRequest, ChatRequest
 from app.schemas.responses import AnalyzeResponse, ChatResponse
-from app.agent.accessibility_agent import analyze_accessibility, chat_about_scan, chat_about_scan_stream
+from app.agent.accessibility_agent import (
+    analyze_accessibility,
+    analyze_accessibility_stream,
+    chat_about_scan,
+    chat_about_scan_stream,
+)
 
 router = APIRouter()
+
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
@@ -47,8 +53,38 @@ async def chat(request: ChatRequest) -> ChatResponse:
         )
 
 
+@router.post("/analyze/stream")
+async def analyze_stream(request: AnalyzeRequest):
+    """
+    Stream accessibility analysis as NDJSON (newline-delimited JSON).
+
+    Each line in the response body is a complete JSON record.  The first
+    record is a summary; subsequent records are individual issues.  The
+    backend parses these line-by-line and forwards them to the client.
+    """
+    async def ndjson_generator():
+        try:
+            async for line in analyze_accessibility_stream(request):
+                # Each line is already JSON — just append a newline.
+                yield f"{line}\n"
+        except Exception as e:
+            # Emit a terminal error line the backend can recognise.
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+
+    return StreamingResponse(
+        ndjson_generator(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
+
     """
     Stream chat response as Server-Sent Events.
 

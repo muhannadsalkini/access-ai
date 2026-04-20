@@ -96,3 +96,39 @@ Previous conversation:
 User's question: {user_message}
 
 Provide a helpful, specific response based on the scan results above."""
+
+
+# ---------------------------------------------------------------------------
+# Streaming analysis — NDJSON (one JSON object per line)
+# ---------------------------------------------------------------------------
+# Used by /agent/analyze/stream.  The backend parses line-by-line so each
+# record can be forwarded to the client the moment Gemini emits it.  The
+# accessibility_score is computed deterministically by the backend from the
+# raw axe impacts, so the model does NOT need to produce it here.
+# ---------------------------------------------------------------------------
+
+STREAM_ANALYSIS_PROMPT_TEMPLATE = """Analyze the following accessibility scan results for the website: {url}
+
+The automated scan (axe-core) detected {violation_count} violations:
+
+{violations_text}
+
+Produce your analysis as NEWLINE-DELIMITED JSON (NDJSON).  Output rules:
+
+1.  Emit ONE valid JSON object per line.  Do not pretty-print — each record must fit on a single line.
+2.  Emit NO other text, commentary, markdown, or code fences — only the JSON lines.
+3.  The FIRST line must be a summary record:
+    {{"type":"summary","summary":"...","priority_recommendations":"..."}}
+4.  Then emit ONE issue record per violation, in priority order (most critical first):
+    {{"type":"issue","issue_type":"...","severity":"critical|serious|moderate|minor","description":"...","recommendation":"...","wcag_reference":"WCAG 2.1 Success Criterion X.Y.Z – ..."}}
+5.  Do NOT emit any wrapping array or outer object.
+
+Within each record:
+- severity must be one of: "critical", "serious", "moderate", "minor".
+- description should plainly explain the issue and who it affects.
+- recommendation must be a concrete, code-level fix the developer can apply.
+- wcag_reference must cite the specific WCAG 2.1 success criterion.
+
+Start with the summary line immediately.  Emit the issues one at a time.  Do not include any score — the backend computes it.
+"""
+
