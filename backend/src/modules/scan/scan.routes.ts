@@ -9,6 +9,10 @@ const router = Router();
 // POST /api/scans — Create a new scan from a URL (guest mode supported)
 router.post("/", optionalAuth as any, scanLimiter, scanController.createScan as any);
 
+// POST /api/scans/stream — Same as /scans but streams progress + AI analysis via SSE (guest mode supported)
+router.post("/stream", optionalAuth as any, scanLimiter, scanController.createScanStream as any);
+
+
 // POST /api/scans/code — Create a new scan from raw HTML code (guest mode supported)
 router.post("/code", optionalAuth as any, scanLimiter, scanController.createCodeScan as any);
 

@@ -37,7 +37,88 @@ export async function createScan(
   }
 }
 
+/**
+ * POST /api/scans/stream — streams scan progress + AI analysis as SSE.
+ *
+ * Unlike createScan (which blocks until the full report is ready), this
+ * endpoint flushes intermediate events to the client:
+ *   - status           : pipeline stage
+ *   - scan             : the scan row (so the UI can grab the scan.id early)
+ *   - progress         : free-form progress message
+ *   - violations_found : raw axe counts + deterministic score
+ *   - summary          : AI-generated summary / priority recommendations
+ *   - issue            : one enriched issue (streamed as Gemini emits them)
+ *   - done             : terminal event with final scan record
+ *   - error            : terminal error event
+ *
+ * Each event is delivered as a line:  event: <name>\ndata: <json>\n\n
+ */
+export async function createScanStream(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = createScanSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const message = parsed.error.errors.map((e) => e.message).join(", ");
+      throw new AppError(message, 400);
+    }
+
+    logger.info(
+      `${req.userId ? `User ${req.userId}` : "[guest]"} requested STREAM scan for: ${parsed.data.url}`
+    );
+
+    // SSE headers — disable proxy buffering so each write is flushed promptly.
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+
+    const writeEvent = (event: string, data: unknown) => {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // Heartbeat so intermediate proxies don't close the connection during the
+    // long quiet stretch between "scanning" and "analyzing".
+    const heartbeat = setInterval(() => {
+      res.write(`: keep-alive ${Date.now()}\n\n`);
+    }, 15_000);
+
+    let clientClosed = false;
+    req.on("close", () => {
+      clientClosed = true;
+      clearInterval(heartbeat);
+    });
+
+    try {
+      for await (const evt of scanService.createScanStream(
+        req.userId || null,
+        parsed.data.url
+      )) {
+        if (clientClosed) break;
+        writeEvent(evt.type, evt);
+      }
+    } catch (err: any) {
+      if (!clientClosed) {
+        writeEvent("error", {
+          type: "error",
+          message: err?.message ?? "Scan failed",
+        });
+      }
+    } finally {
+      clearInterval(heartbeat);
+      if (!clientClosed) res.end();
+    }
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getScans(
+
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction

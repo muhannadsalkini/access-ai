@@ -138,9 +138,134 @@ export interface AgentChatResponse {
   response: string;
 }
 
+// ---------------------------------------------------------------------------
+// Streaming analyze — yields NDJSON records from the agent
+// ---------------------------------------------------------------------------
+
+export interface AgentStreamSummary {
+  type: "summary";
+  summary: string;
+  priority_recommendations: string;
+}
+
+export interface AgentStreamIssue {
+  type: "issue";
+  issue_type: string;
+  severity: string;
+  description: string;
+  recommendation: string;
+  wcag_reference: string;
+}
+
+export interface AgentStreamError {
+  type: "error";
+  message: string;
+}
+
+export type AgentStreamRecord =
+  | AgentStreamSummary
+  | AgentStreamIssue
+  | AgentStreamError;
+
+/**
+ * Call the agent's /agent/analyze/stream endpoint and yield each NDJSON record
+ * as the agent emits it.  Retries with backoff on transient errors (cold start).
+ */
+export async function* callAgentAnalyzeStream(
+  request: AgentRequest
+): AsyncGenerator<AgentStreamRecord, void, void> {
+  const agentUrl = `${env.agentServiceUrl}/agent/analyze/stream`;
+  logger.info(`Streaming AI agent at ${agentUrl} for scan ${request.scanId}...`);
+
+  // Retry loop for opening the stream — once the stream is open we can't retry.
+  let response: Response | null = null;
+  let lastError: any;
+  for (let attempt = 0; attempt <= AGENT_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      response = await fetch(agentUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(env.agentInternalSecret
+            ? { "X-Internal-Secret": env.agentInternalSecret }
+            : {}),
+        },
+        body: JSON.stringify({
+          url: request.url,
+          scan_id: request.scanId,
+          violations: request.violations,
+        }),
+        // Longer timeout — the whole streaming response is one HTTP request.
+        signal: AbortSignal.timeout(120_000),
+      });
+
+      if (!response.ok) {
+        const err: any = new Error(
+          `Agent stream returned ${response.status}`
+        );
+        err.status = response.status;
+        throw err;
+      }
+      break; // success
+    } catch (err: any) {
+      lastError = err;
+      if (attempt === AGENT_RETRY_DELAYS_MS.length) throw err;
+      if (!isTransientAgentError(err.status, err)) throw err;
+      const delay = AGENT_RETRY_DELAYS_MS[attempt];
+      logger.warn(
+        `[callAgentAnalyzeStream] Agent unavailable (attempt ${attempt + 1}/${AGENT_RETRY_DELAYS_MS.length}). ` +
+          `Retrying in ${delay / 1000}s — server may be waking up...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  if (!response || !response.body) {
+    throw lastError ?? new Error("Agent stream returned no body");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIdx: number;
+      while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
+        const rawLine = buffer.slice(0, newlineIdx).trim();
+        buffer = buffer.slice(newlineIdx + 1);
+        if (!rawLine) continue;
+        try {
+          yield JSON.parse(rawLine) as AgentStreamRecord;
+        } catch {
+          // Not valid JSON — skip.  The agent may occasionally emit a
+          // whitespace-only line we don't care about.
+        }
+      }
+    }
+
+    // Flush any trailing line that didn't end with \n.
+    const tail = buffer.trim();
+    if (tail) {
+      try {
+        yield JSON.parse(tail) as AgentStreamRecord;
+      } catch {
+        /* ignore */
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export async function callAgentChat(
   request: AgentChatRequest
 ): Promise<AgentChatResponse> {
+
   const agentUrl = `${env.agentServiceUrl}/agent/chat`;
 
   logger.info(`Calling AI agent chat at ${agentUrl}...`);
