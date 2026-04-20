@@ -1,23 +1,20 @@
 import { useEffect, useState } from "react";
-import { ServerCrash } from "lucide-react";
 import Logo from "../components/Logo";
 
 interface ProgressScreenProps {
   url: string;
-  coldStart: boolean;
 }
 
 const STEPS = [
-  { label: "Connecting to scanner..." },
   { label: "Loading the page..." },
   { label: "Running accessibility checks..." },
   { label: "Analyzing issues with AI..." },
   { label: "Generating report..." },
 ];
 
-const STEP_DURATION_MS = 8_000; // advance every 8 seconds
+const STEP_DURATION_MS = 10_000; // advance every 10 seconds
 
-export default function ProgressScreen({ url, coldStart }: ProgressScreenProps) {
+export default function ProgressScreen({ url }: ProgressScreenProps) {
   const [stepIndex, setStepIndex] = useState(0);
 
   // Cycle through steps while waiting for the API response
@@ -28,8 +25,7 @@ export default function ProgressScreen({ url, coldStart }: ProgressScreenProps) 
     return () => clearInterval(timer);
   }, []);
 
-  const displayUrl =
-    url.length > 42 ? url.slice(0, 39) + "…" : url;
+  const displayUrl = url.length > 42 ? url.slice(0, 39) + "…" : url;
 
   return (
     <div className="flex-1 flex flex-col bg-[#09090b]">
@@ -44,7 +40,10 @@ export default function ProgressScreen({ url, coldStart }: ProgressScreenProps) 
         {/* Animated rings */}
         <div className="relative mb-7">
           <div className="w-16 h-16 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin" />
-          <div className="absolute inset-2 rounded-full border-2 border-violet-500/10 border-t-violet-500/50 animate-spin" style={{ animationDirection: "reverse", animationDuration: "1.2s" }} />
+          <div
+            className="absolute inset-2 rounded-full border-2 border-violet-500/10 border-t-violet-500/50 animate-spin"
+            style={{ animationDirection: "reverse", animationDuration: "1.2s" }}
+          />
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-4 h-4 rounded-full bg-indigo-500/20 border border-indigo-500/40 animate-pulse" />
           </div>
@@ -65,10 +64,7 @@ export default function ProgressScreen({ url, coldStart }: ProgressScreenProps) 
             const isCurrent = i === stepIndex;
 
             return (
-              <div
-                key={step.label}
-                className="flex items-center gap-2.5 text-left"
-              >
+              <div key={step.label} className="flex items-center gap-2.5 text-left">
                 {/* Indicator */}
                 <div className="shrink-0 w-4 flex items-center justify-center">
                   {isDone && (
@@ -97,21 +93,6 @@ export default function ProgressScreen({ url, coldStart }: ProgressScreenProps) 
             );
           })}
         </div>
-
-        {/* Cold-start warning */}
-        {coldStart && (
-          <div className="mt-6 w-full flex items-start gap-2.5 bg-amber-500/8 border border-amber-500/20 rounded-xl p-3 text-left animate-fade-in">
-            <ServerCrash className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-medium text-amber-300 mb-0.5">
-                Waking up servers...
-              </p>
-              <p className="text-[11px] text-zinc-500 leading-relaxed">
-                The scanner is starting up after being idle. This may take up to 60 seconds.
-              </p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

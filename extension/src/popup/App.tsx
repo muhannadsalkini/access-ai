@@ -22,7 +22,6 @@ type ViewState =
 export default function App() {
   const [view, setView] = useState<ViewState>({ screen: "loading" });
   const [session, setSession] = useState<Session | null>(null);
-  const [coldStart, setColdStart] = useState(false);
 
   // ── Auth init ────────────────────────────────────────────────────────────
 
@@ -49,11 +48,10 @@ export default function App() {
   };
 
   const handleStartScan = async (url: string) => {
-    setColdStart(false);
     setView({ screen: "progress", url });
 
     try {
-      const result = await createScan(url, () => setColdStart(true));
+      const result = await createScan(url);
       setView({ screen: "report", result });
     } catch (err: unknown) {
       const message =
@@ -90,7 +88,7 @@ export default function App() {
   }
 
   if (view.screen === "progress") {
-    return <ProgressScreen url={view.url} coldStart={coldStart} />;
+    return <ProgressScreen url={view.url} />;
   }
 
   if (view.screen === "report") {
