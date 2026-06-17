@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireAuth, optionalAuth } from "../auth/auth.middleware";
-import { scanLimiter } from "../../middleware/rate-limiter";
+import { scanLimiter, chatLimiter } from "../../middleware/rate-limiter";
 import * as scanController from "./scan.controller";
 import * as chatController from "../chat/chat.controller";
 
@@ -33,12 +33,14 @@ router.delete("/:id", requireAuth as any, scanController.deleteScan as any);
 router.get("/:scanId/chat", requireAuth as any, chatController.getMessages as any);
 
 // POST /api/scans/:scanId/chat — Send a chat message
-router.post("/:scanId/chat", requireAuth as any, chatController.sendMessage as any);
+// chatLimiter: 20 messages per hour per user to prevent AI cost abuse
+router.post("/:scanId/chat", requireAuth as any, chatLimiter, chatController.sendMessage as any);
 
 // DELETE /api/scans/:scanId/chat — Clear all chat messages
 router.delete("/:scanId/chat", requireAuth as any, chatController.clearMessages as any);
 
 // POST /api/scans/:scanId/chat/stream — Send a chat message with streaming response
-router.post("/:scanId/chat/stream", requireAuth as any, chatController.sendMessageStream as any);
+// chatLimiter: shared with non-streaming endpoint (same 20/hr bucket per user)
+router.post("/:scanId/chat/stream", requireAuth as any, chatLimiter, chatController.sendMessageStream as any);
 
 export default router;
