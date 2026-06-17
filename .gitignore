@@ -46,4 +46,5 @@ test-results/
 
 # Tex files (academic paper - not part of the app)
 tex/
+2026-expert-systems 2/
 *.pdf
