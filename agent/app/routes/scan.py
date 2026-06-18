@@ -1,7 +1,10 @@
 """Agent scan route — POST /agent/analyze, POST /agent/chat, POST /agent/chat/stream."""
 
 import json
+import logging
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import StreamingResponse
 from app.schemas.requests import AnalyzeRequest, ChatRequest
 from app.schemas.responses import AnalyzeResponse, ChatResponse
@@ -28,10 +31,11 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     try:
         result = await analyze_accessibility(request)
         return result
-    except Exception as e:
+    except Exception:
+        logger.exception("Agent analysis failed")
         raise HTTPException(
             status_code=500,
-            detail=f"Agent analysis failed: {str(e)}",
+            detail="Analysis failed. Please try again.",
         )
 
 
@@ -46,10 +50,11 @@ async def chat(request: ChatRequest) -> ChatResponse:
     try:
         result = await chat_about_scan(request)
         return result
-    except Exception as e:
+    except Exception:
+        logger.exception("Agent chat failed")
         raise HTTPException(
             status_code=500,
-            detail=f"Agent chat failed: {str(e)}",
+            detail="Chat failed. Please try again.",
         )
 
 
@@ -67,9 +72,10 @@ async def analyze_stream(request: AnalyzeRequest):
             async for line in analyze_accessibility_stream(request):
                 # Each line is already JSON — just append a newline.
                 yield f"{line}\n"
-        except Exception as e:
+        except Exception:
+            logger.exception("Agent stream analysis failed")
             # Emit a terminal error line the backend can recognise.
-            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+            yield json.dumps({"type": "error", "message": "Analysis failed. Please try again."}) + "\n"
 
     return StreamingResponse(
         ndjson_generator(),
@@ -100,8 +106,9 @@ async def chat_stream(request: ChatRequest):
                 yield f"data: {json.dumps({'text': chunk})}\n\n"
             # Send completion event
             yield f"data: {json.dumps({'done': True, 'full_text': full_text})}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        except Exception:
+            logger.exception("Agent chat stream failed")
+            yield f"data: {json.dumps({'error': 'Chat failed. Please try again.'})}\n\n"
 
     return StreamingResponse(
         event_generator(),

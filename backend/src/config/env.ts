@@ -17,6 +17,9 @@ export const env = {
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
   extensionOrigin: process.env.EXTENSION_ORIGIN || "",
   nodeEnv: process.env.NODE_ENV || "development",
+  // HMAC secret used to hash API keys — REQUIRED in production.
+  // Generate with: openssl rand -hex 32
+  apiKeySecret: process.env.API_KEY_SECRET || "",
 } as const;
 
 // Validate required environment variables
@@ -24,13 +27,16 @@ const requiredVars = [
   "supabaseUrl",
   "supabaseServiceRoleKey",
   "supabaseAnonKey",
+  "apiKeySecret",
 ] as const;
 
 export function validateEnv(): void {
   const missing = requiredVars.filter((key) => !env[key]);
   if (missing.length > 0) {
-    console.warn(
-      `⚠️  Missing environment variables: ${missing.join(", ")}. Some features may not work.`
+    // Fatal: crash on startup rather than silently serving broken responses
+    console.error(
+      `❌ Missing required environment variables: ${missing.join(", ")}. Aborting.`
     );
+    process.exit(1);
   }
 }

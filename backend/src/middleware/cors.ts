@@ -2,17 +2,23 @@ import cors from "cors";
 import { env } from "../config/env";
 
 // Build the origin allow-list.
-// EXTENSION_ORIGIN can be a specific chrome-extension:// URL,
-// or set to "chrome-extension://*" to allow any extension during development.
+//
+// In PRODUCTION: only allow the exact extension ID set in EXTENSION_ORIGIN.
+//   Allowing a wildcard regex lets any installed Chrome extension make
+//   authenticated requests on behalf of the user — a significant CSRF risk.
+//
+// In DEVELOPMENT: fall back to the broad regex so local extension builds work
+//   without needing to know the extension ID.
 const allowedOrigins: (string | RegExp)[] = [
   env.frontendUrl,
   "http://localhost:3000",
-  // Always allow all Chrome extension origins
-  /^chrome-extension:\/\//,
 ];
 
-if (env.extensionOrigin && env.extensionOrigin !== "chrome-extension://*") {
-  // Allow a specific extension origin if explicitly configured
+if (env.nodeEnv === "development") {
+  // Dev only — accept any chrome-extension:// origin for convenience
+  allowedOrigins.push(/^chrome-extension:\/\//);
+} else if (env.extensionOrigin) {
+  // Production — lock to the specific extension ID
   allowedOrigins.push(env.extensionOrigin);
 }
 

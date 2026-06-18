@@ -14,8 +14,6 @@ services:
       - AGENT_SERVICE_URL=http://agent:8000
     depends_on:
       - agent
-    volumes:
-      - ./backend/src:/app/src
 
   agent:
     build:
@@ -41,5 +39,3 @@ services:
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
     depends_on:
       - backend
-    volumes:
-      - ./frontend/src:/app/src

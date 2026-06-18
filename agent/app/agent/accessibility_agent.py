@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import asyncio
 import queue
 import threading
@@ -20,32 +21,83 @@ from app.agent.prompts import (
 from app.schemas.requests import AnalyzeRequest, ChatRequest
 from app.schemas.responses import AnalyzeResponse, AnalyzedIssue, ChatResponse
 
+# ---------------------------------------------------------------------------
+# Prompt injection sanitization helpers
+# ---------------------------------------------------------------------------
+# User-controlled values (URLs, HTML snippets, titles, user messages) must be
+# sanitized before they are interpolated into AI prompts.  Without this, an
+# attacker could embed instructions in a page title or HTML element that
+# manipulate the model's output.
+# ---------------------------------------------------------------------------
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+# Maximum character budget for the total violations_text block.
+_MAX_VIOLATIONS_TEXT_CHARS = 50_000
+# Per-field limits inside a single violation element.
+_MAX_SELECTOR_CHARS = 300
+_MAX_HTML_CHARS = 500
+_MAX_FAILURE_SUMMARY_CHARS = 500
+# URL / title length caps.
+_MAX_URL_CHARS = 500
+_MAX_TITLE_CHARS = 100
+
+
+def _sanitize_url(url: str) -> str:
+    """Strip control characters and newlines from a URL; truncate."""
+    if not url:
+        return ""
+    url = _CONTROL_CHAR_RE.sub("", url)
+    url = url.replace("\n", " ").replace("\r", " ")
+    return url[:_MAX_URL_CHARS]
+
+
+def _sanitize_text(text: str, max_len: int) -> str:
+    """Strip HTML tags and control characters from a text field; truncate."""
+    if not text:
+        return ""
+    text = _HTML_TAG_RE.sub("", text)
+    text = _CONTROL_CHAR_RE.sub("", text)
+    text = text.replace("\n", " ").replace("\r", " ")
+    return text[:max_len]
 
 
 def _format_violations(violations) -> str:
-    """Format axe-core violations into a readable text for the agent."""
+    """Format axe-core violations into a readable text for the agent.
+
+    All user-controlled fields (selector, HTML snippet, failure summary) are
+    sanitized to prevent prompt injection before being included in the prompt.
+    The combined output is capped at _MAX_VIOLATIONS_TEXT_CHARS characters.
+    """
     if not violations:
         return "No violations detected."
 
     parts = []
     for i, v in enumerate(violations, 1):
         elements = "\n".join(
-            f"    - Selector: {el.selector}\n      HTML: {el.html}\n      Issue: {el.failureSummary}"
+            f"    - Selector: {_sanitize_text(el.selector, _MAX_SELECTOR_CHARS)}\n"
+            f"      HTML: {_sanitize_text(el.html, _MAX_HTML_CHARS)}\n"
+            f"      Issue: {_sanitize_text(el.failureSummary, _MAX_FAILURE_SUMMARY_CHARS)}"
             for el in v.affectedElements
         )
         parts.append(
             f"""Violation {i}:
-  Rule: {v.ruleId}
-  Impact: {v.impact}
-  Description: {v.description}
-  Help: {v.help}
-  Help URL: {v.helpUrl}
-  WCAG Tags: {', '.join(v.tags)}
+  Rule: {_sanitize_text(v.ruleId, 100)}
+  Impact: {_sanitize_text(v.impact, 50)}
+  Description: {_sanitize_text(v.description, 300)}
+  Help: {_sanitize_text(v.help, 300)}
+  Help URL: {_sanitize_url(v.helpUrl)}
+  WCAG Tags: {', '.join(_sanitize_text(t, 50) for t in v.tags)}
   Affected Elements:
 {elements}"""
         )
 
-    return "\n\n".join(parts)
+    result = "\n\n".join(parts)
+    # Hard cap on total violations block to prevent context-window overflow.
+    if len(result) > _MAX_VIOLATIONS_TEXT_CHARS:
+        result = result[:_MAX_VIOLATIONS_TEXT_CHARS] + "\n\n[... truncated for length ...]"
+    return result
 
 
 async def analyze_accessibility(request: AnalyzeRequest) -> AnalyzeResponse:
@@ -60,12 +112,15 @@ async def analyze_accessibility(request: AnalyzeRequest) -> AnalyzeResponse:
     # Configure the Gemini client
     client = genai.Client(api_key=settings.google_api_key)
 
+    # Sanitize user-controlled URL before interpolating into prompt
+    safe_url = _sanitize_url(request.url)
+
     # Format the violations for the prompt
     violations_text = _format_violations(request.violations)
 
     # Build the analysis prompt
     prompt = ANALYSIS_PROMPT_TEMPLATE.format(
-        url=request.url,
+        url=safe_url,
         violation_count=len(request.violations),
         violations_text=violations_text,
     )
@@ -143,6 +198,10 @@ async def chat_about_scan(request: ChatRequest) -> ChatResponse:
     settings = get_settings()
     client = genai.Client(api_key=settings.google_api_key)
 
+    # Sanitize user-controlled fields before interpolating into the prompt
+    safe_url = _sanitize_url(request.url)
+    safe_message = _sanitize_text(request.message, 2000)
+
     # Format conversation history
     history_text = ""
     if request.conversation_history:
@@ -156,12 +215,12 @@ async def chat_about_scan(request: ChatRequest) -> ChatResponse:
 
     # Build the chat prompt
     prompt = CHAT_PROMPT_TEMPLATE.format(
-        url=request.url,
+        url=safe_url,
         score=request.score,
         summary=request.summary,
         issues_text=request.issues_text,
         conversation_history=history_text,
-        user_message=request.message,
+        user_message=safe_message,
     )
 
     # Call Gemini
@@ -188,6 +247,10 @@ async def chat_about_scan_stream(request: ChatRequest) -> AsyncGenerator[str, No
     settings = get_settings()
     client = genai.Client(api_key=settings.google_api_key)
 
+    # Sanitize user-controlled fields before interpolating into the prompt
+    safe_url = _sanitize_url(request.url)
+    safe_message = _sanitize_text(request.message, 2000)
+
     # Format conversation history
     history_text = ""
     if request.conversation_history:
@@ -201,12 +264,12 @@ async def chat_about_scan_stream(request: ChatRequest) -> AsyncGenerator[str, No
 
     # Build the chat prompt
     prompt = CHAT_PROMPT_TEMPLATE.format(
-        url=request.url,
+        url=safe_url,
         score=request.score,
         summary=request.summary,
         issues_text=request.issues_text,
         conversation_history=history_text,
-        user_message=request.message,
+        user_message=safe_message,
     )
 
     # Use a thread-safe queue to bridge sync Gemini streaming → async generator
@@ -269,10 +332,13 @@ async def analyze_accessibility_stream(
     settings = get_settings()
     client = genai.Client(api_key=settings.google_api_key)
 
+    # Sanitize user-controlled URL before interpolating into prompt
+    safe_url = _sanitize_url(request.url)
+
     violations_text = _format_violations(request.violations)
 
     prompt = STREAM_ANALYSIS_PROMPT_TEMPLATE.format(
-        url=request.url,
+        url=safe_url,
         violation_count=len(request.violations),
         violations_text=violations_text,
     )

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { supabaseAdmin } from "../../services/supabase/client";
 import { AppError } from "../../middleware/error-handler";
 import { logger } from "../../utils/logger";
+import { env } from "../../config/env";
 import type {
   ApiKeyPublic,
   CreateApiKeyResponse,
@@ -16,10 +17,20 @@ function generateRawKey(): string {
 }
 
 /**
- * Hash an API key using SHA-256.
+ * Hash an API key using HMAC-SHA256 with a server-side secret.
+ *
+ * Using a server-side secret (rather than plain SHA-256) means that even a
+ * full database dump cannot be used to reconstruct API keys via rainbow tables
+ * or brute-force, because the attacker would also need the API_KEY_SECRET.
+ *
+ * NOTE: Changing API_KEY_SECRET in production invalidates all existing keys —
+ * users will need to regenerate them.  Rotate the secret only intentionally.
  */
 function hashKey(rawKey: string): string {
-  return crypto.createHash("sha256").update(rawKey).digest("hex");
+  return crypto
+    .createHmac("sha256", env.apiKeySecret)
+    .update(rawKey)
+    .digest("hex");
 }
 
 /**
