@@ -1,386 +1,84 @@
-# AccessAI MCP Server
+# MCP Server (`mcp-server/`)
 
-**Model Context Protocol (MCP) server** for [AccessAI](https://github.com/muhannadsalkini/access-ai) — AI-powered web accessibility scanning and analysis, directly from your IDE.
+TypeScript MCP (Model Context Protocol) server over **stdio**. Published to npm as `accessai-mcp`.
 
-[![npm version](https://img.shields.io/npm/v/accessai-mcp.svg)](https://www.npmjs.com/package/accessai-mcp)
-[![npm downloads](https://img.shields.io/npm/dm/accessai-mcp.svg)](https://www.npmjs.com/package/accessai-mcp)
+> This file documents the module's architecture. End-user install/config docs (IDE setup, SDK examples) live in the root `README.md`.
 
-📦 **npm:** [https://www.npmjs.com/package/accessai-mcp](https://www.npmjs.com/package/accessai-mcp)
+## Purpose
 
-Works with **Cursor**, **Cline**, **Claude Code**, **Windsurf**, and any MCP-compatible developer agent.
+Exposes AccessAI's accessibility scanning and analysis as MCP tools/resources for IDE agents (Cursor, Cline, Claude Code, Windsurf). It is a thin client: every tool call is translated into an HTTP request to the AccessAI backend. It also ships a reusable API client library (`accessai-mcp/client`).
 
-## What it does
+## Boundaries
 
-This MCP server lets developer agents scan websites for WCAG accessibility issues, get AI-powered fix recommendations, view scan history, and ask follow-up questions — all without leaving your editor.
+- It does **not** run axe-core, Playwright, or Gemini — all work happens in the backend/agent.
+- It does **not** store data or manage sessions; the only credential is an optional `ACCESSAI_API_KEY` passed as a Bearer token.
+- It does **not** talk to Supabase directly.
+- Guest mode (no key) is supported only for `scan_url`, `scan_code`, `fix_code`; history/report/chat/compare/delete require a key and short-circuit with a "key required" message otherwise.
 
-## Guest Mode vs. Authenticated Mode
+## Public surface
 
-> No API key? No problem!
-
-| Tool | Without API key | With API key |
-|------|-----------------|--------------|
-| `scan_url` | ✅ Works — results **not** saved to history | ✅ Works — results saved |
-| `scan_code` | ✅ Works — results **not** saved to history | ✅ Works — results saved |
-| `fix_code` | ✅ Works — results **not** saved to history | ✅ Works — results saved |
-| `get_scan_history` | ❌ Requires API key | ✅ Works |
-| `get_scan_report` | ❌ Requires API key | ✅ Works |
-| `chat_about_scan` | ❌ Requires API key | ✅ Works |
-| `compare_scans` | ❌ Requires API key | ✅ Works |
-| `delete_scan` | ❌ Requires API key | ✅ Works |
-
-**TL;DR:**
-- **No API key** → You can scan URLs and HTML code right away. Results are returned inline but not stored — perfect for a quick check or trying out the tool.
-- **With API key** → Full experience: results are saved to your account, you can view history, pull detailed reports, have an AI conversation about the findings, auto-fix code, compare scans, and delete old results.
-
-Get a free API key at [access-ai.solutions](https://access-ai.solutions) → Settings → API Keys.
+Entry point: `src/index.ts` (bootstraps `McpServer`, registers tools/resources, connects `StdioServerTransport`).
 
 ### Tools
 
-| Tool | Description |
-|------|-------------|
-| `scan_url` | Scan a website URL for WCAG accessibility issues with AI analysis |
-| `scan_code` | Scan raw HTML code directly for accessibility issues (no URL needed) |
-| `fix_code` | Scan HTML code and return the **fixed version** in one step *(guest mode supported)* |
-| `get_scan_history` | View your past accessibility scan history *(API key required)* |
-| `get_scan_report` | Get the full detailed report for a specific scan *(API key required)* |
-| `chat_about_scan` | Ask the AI follow-up questions about scan results *(API key required)* |
-| `compare_scans` | Compare two scans to measure accessibility improvement *(API key required)* |
-| `delete_scan` | Delete a scan and all its data from history *(API key required)* |
+| Tool | Handler | Backend call |
+|---|---|---|
+| `scan_url` | `tools/scan-url.ts` | `POST /api/scans` |
+| `scan_code` | `tools/scan-code.ts` | `POST /api/scans/code` |
+| `fix_code` | `tools/fix-code.ts` | `POST /api/scans/fix` |
+| `get_scan_history` | `tools/get-scan-history.ts` | `GET /api/scans` |
+| `get_scan_report` | `tools/get-scan-report.ts` | `GET /api/scans/:id` |
+| `chat_about_scan` | `tools/chat-about-scan.ts` | `POST /api/scans/:id/chat` |
+| `compare_scans` | `tools/compare-scans.ts` | two `GET /api/scans/:id` |
+| `delete_scan` | `tools/delete-scan.ts` | `DELETE /api/scans/:id` |
 
 ### Resources
 
-| Resource | Description |
-|----------|-------------|
-| `accessai://scans/latest` | Latest scan report as context |
+- `accessai://scans/latest` — `resources/latest-scan.ts` — latest scan report surfaced as agent context.
 
-## Prerequisites
+### Library exports (`src/client.ts`, entry `accessai-mcp/client`)
 
-- **Node.js 18+**
-- An **AccessAI API key** is **optional** for quick scans, but **required** to save results, view history, and use AI chat.
-  - Sign up at [access-ai.solutions](https://access-ai.solutions)
-  - Generate a key from **Settings → API Keys** (starts with `ak_live_...`)
+- `createAccessAIClient({ apiKey, backendUrl? })` → `ApiClient`.
+- `ApiClient` methods: `createScan`, `createCodeScan`, `fixCode`, `getScans`, `getScanById`, `getReport`, `sendChatMessage`, `getChatMessages`, `deleteScan`, `isGuestMode`.
+- `AuthManager` — turns the config's API key into a Bearer token (empty string ⇒ guest).
+- Re-exported types: `ScanRecord`, `IssueRecord`, `ReportRecord`, `ScanResponse`, `ReportWithIssues`, `ChatMessage`, `SendChatResponse`.
 
-## Quick Setup
+## Dependencies
 
-### Option A: Guest mode (no API key needed)
+- **Internal (this repo):** depends on the **backend** HTTP API only. Nothing in this repo depends on it (it's a distributed npm package / IDE integration).
+- **External:** `@modelcontextprotocol/sdk`, `zod`.
+- **Config (`src/config.ts`):** `ACCESSAI_API_KEY` (optional), `ACCESSAI_BACKEND_URL` (defaults to `https://access-ai-backend.onrender.com`).
+- **Layer note:** the client mirrors the backend's response envelope (`{ success, data }`) and record types — these are duplicated, not shared, so they must be kept in sync manually with `backend/src/modules/scan/scan.types.ts`.
 
-Just add the MCP server — no key required. You can start scanning URLs and HTML code immediately:
+## Key flows
 
-```json
-{
-  "mcpServers": {
-    "accessai": {
-      "command": "npx",
-      "args": ["-y", "accessai-mcp"]
-    }
-  }
-}
-```
+### 1. `scan_url` (guest or authenticated)
+1. `handleScanUrl` checks `apiClient.isGuestMode()`, calls `createScan(url)`.
+2. `ApiClient.request` attaches `Authorization: Bearer <key>` if present, POSTs to `/api/scans` (600s timeout), unwraps `{ success, data }`.
+3. Result is formatted as Markdown grouped by severity; guest results append a "not saved" notice with a link to get a key.
 
-> Scan results will be returned directly in the chat but **not saved** to your account history.
+### 2. Key-gated tool (e.g. `get_scan_history`)
+1. Handler returns `GUEST_MODE_MSG` immediately if `isGuestMode()`.
+2. Otherwise calls `getScans()` and renders a Markdown table with score emojis and scan IDs.
 
-### Option B: Authenticated mode (full experience)
+### 3. Bootstrap
+1. `loadConfig()` reads env, strips trailing slashes from the backend URL.
+2. `AuthManager` + `ApiClient` are constructed, tools/resources registered on `McpServer`, then `server.connect(new StdioServerTransport())`.
 
-#### Step 1: Generate an API Key
+## Rules and constraints
 
-1. Log in to your [AccessAI dashboard](https://access-ai.solutions)
-2. Go to **Settings → API Keys**
-3. Click **"Generate New Key"**
-4. Copy the key (it starts with `ak_live_...`) — it's only shown once!
+- **Every tool handler must catch errors and return a human-readable string, never throw.** Reason: MCP tool results are surfaced to the agent as text; an uncaught throw degrades the agent UX.
+- **Key-requiring tools must short-circuit in guest mode before any HTTP call.** Reason: avoids a confusing backend 401 and tells the user exactly how to get a key.
+- **The API key is only ever sent as a Bearer header to the configured backend.** Reason: it's a live credential; it must not be logged or sent elsewhere.
+- **Response types must match the backend envelope `{ success, data }`.** Reason: `request()` throws if `success` is false or the shape is unexpected.
+- **stdout is reserved for the MCP protocol; diagnostics go to stderr.** Reason: `index.ts` writes fatal errors to `process.stderr` so they don't corrupt the stdio transport.
 
-#### Step 2: Configure your IDE
+## Gotchas
 
-Add this to your IDE's MCP configuration:
+- **Long timeouts:** `createScan` uses a 600s timeout, code/fix use 300s — tuned for Render cold starts + full scans; agents may appear to "hang" for a minute on the first call.
+- **Type drift risk:** `api-client.ts` re-declares backend types; a backend schema change won't be caught by the compiler here.
+- **Version numbers are hardcoded** in `index.ts` (`version: "1.3.1"`) and the header comment (mentions v1.3.0 tools) — keep them aligned with `package.json`. TODO: verify current published version.
+- **Default backend URL is the production Render host**, so `npx accessai-mcp` with no env talks to production immediately.
 
-**Cursor** (`~/.cursor/mcp.json`):
-```json
-{
-  "mcpServers": {
-    "accessai": {
-      "command": "npx",
-      "args": ["-y", "accessai-mcp"],
-      "env": {
-        "ACCESSAI_API_KEY": "ak_live_your_key_here"
-      }
-    }
-  }
-}
-```
-
-**Cline** (VS Code settings → Cline MCP Settings):
-```json
-{
-  "mcpServers": {
-    "accessai": {
-      "command": "npx",
-      "args": ["-y", "accessai-mcp"],
-      "env": {
-        "ACCESSAI_API_KEY": "ak_live_your_key_here"
-      }
-    }
-  }
-}
-```
-
-**Claude Code** (`~/.claude/claude_desktop_config.json`):
-```json
-{
-  "mcpServers": {
-    "accessai": {
-      "command": "npx",
-      "args": ["-y", "accessai-mcp"],
-      "env": {
-        "ACCESSAI_API_KEY": "ak_live_your_key_here"
-      }
-    }
-  }
-}
-```
-
-### Option: Build from source
-
-```bash
-git clone https://github.com/muhannadsalkini/access-ai.git
-cd access-ai/mcp-server
-npm install
-npm run build
-```
-
-Then configure your IDE to use the built file:
-
-```json
-{
-  "mcpServers": {
-    "accessai": {
-      "command": "node",
-      "args": ["/absolute/path/to/access-ai/mcp-server/dist/index.js"],
-      "env": {
-        "ACCESSAI_API_KEY": "ak_live_your_key_here"
-      }
-    }
-  }
-}
-```
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ACCESSAI_API_KEY` | ❌ optional | Your AccessAI API key (starts with `ak_live_`). Required only for `get_scan_history`, `get_scan_report`, and `chat_about_scan`. `scan_url` and `scan_code` work without it (guest mode). |
-| `ACCESSAI_BACKEND_URL` | ❌ optional | Custom backend URL (defaults to production). |
-
-## Usage Examples
-
-Once configured, you can ask your AI agent things like:
-
-**Scanning:**
-- *"Scan https://example.com for accessibility issues"*
-- *"Scan this HTML component for WCAG issues"*
-
-**History & reports:**
-- *"Show me my recent accessibility scans"*
-- *"Get the full report for my last scan"*
-
-**AI chat:**
-- *"How do I fix the color contrast issues from the scan?"*
-- *"Which accessibility issues should I prioritize fixing?"*
-- *"Show me code examples for adding ARIA labels"*
-
-**Fix code:**
-- *"Fix all accessibility issues in this HTML file"*
-- *"Scan and auto-fix this component"*
-
-**Compare scans:**
-- *"Compare my scan from last week to today's — did I improve?"*
-- *"Show me what accessibility issues I fixed between these two scans"*
-
-**Delete:**
-- *"Delete the old test scans from my history"*
-- *"Clean up scan abc123 from my history"*
-
-## Tool Reference
-
-### `scan_url`
-Scan a live website URL for WCAG accessibility issues.
-- **Input:** `url` (string) — e.g. `https://example.com` or a sitemap URL
-- **Output:** Accessibility score, issues grouped by severity, fix recommendations
-- **API key:** Optional (results not saved in guest mode)
-
-### `scan_code`
-Scan raw HTML code directly without needing a live URL.
-- **Input:** `html` (string), `title` (optional)
-- **Output:** Accessibility score, issues, AI recommendations
-- **API key:** Optional (results not saved in guest mode)
-
-### `fix_code`
-Scan HTML code **and** return a fixed version with all issues resolved — in a single tool call.
-- **Input:** `html` (string), `title` (optional)
-- **Output:** Original score, issue count, and the complete fixed HTML code
-- **API key:** Optional (results saved only when authenticated)
-- **Ideal for:** Agents that want to write accessible code automatically
-
-```
-# Example agent prompt
-"Fix all accessibility issues in this button component:
-<button onclick='handleClick()'>Submit</button>"
-
-# Returns the fixed HTML with ARIA labels, keyboard handlers, etc.
-```
-
-### `get_scan_history`
-View past scan history.
-- **Input:** `limit` (optional, default 10)
-- **Output:** List of scans with URLs, dates, scores
-- **API key:** Required
-
-### `get_scan_report`
-Get the full detailed report for a scan.
-- **Input:** `scan_id` (UUID from `get_scan_history`)
-- **Output:** Full report with all issues, recommendations, and WCAG references
-- **API key:** Required
-
-### `chat_about_scan`
-Ask the AI assistant follow-up questions about a scan.
-- **Input:** `scan_id`, `message`
-- **Output:** AI response in markdown
-- **API key:** Required
-
-### `compare_scans`
-Compare two scans to measure improvement or detect regressions.
-- **Input:** `before_scan_id`, `after_scan_id`
-- **Output:** Score delta, fixed issue types, new regressions, remaining issues by severity
-- **API key:** Required
-- **Ideal for:** Verifying that accessibility fixes actually improved the score
-
-```
-# Example: compare before and after fixing
-compare_scans(
-  before_scan_id: "uuid-of-original-scan",
-  after_scan_id: "uuid-of-fixed-scan"
-)
-
-# Returns a table: Score 65 → 90 (+25), 3 issue types fixed, 0 regressions
-```
-
-### `delete_scan`
-Delete a scan and all its related data (issues, report, chat history).
-- **Input:** `scan_id`
-- **Output:** Success confirmation
-- **API key:** Required
-- **Note:** This action is irreversible
-
-## Using as a Library (SDK Integration)
-
-Besides the MCP server, you can also import `accessai-mcp` as a **regular npm library** and use it with any AI SDK or your own code.
-
-### Direct API Client
-
-```typescript
-import { createAccessAIClient } from "accessai-mcp/client";
-
-const client = createAccessAIClient({
-  apiKey: "ak_live_your_key_here",
-});
-
-// Scan a URL
-const result = await client.createScan("https://example.com");
-console.log(`Score: ${result.scan.accessibility_score}/100`);
-console.log(`Issues: ${result.issues.length}`);
-
-// Get scan history
-const scans = await client.getScans();
-
-// Get full report
-const report = await client.getScanById(scans[0].id);
-
-// Chat about results
-const chat = await client.sendChatMessage(scans[0].id, "How do I fix the contrast issues?");
-console.log(chat.response.content);
-```
-
-### Vercel AI SDK
-
-```typescript
-import { experimental_createMCPClient } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
-import { generateText } from "ai";
-
-const mcpClient = await experimental_createMCPClient({
-  transport: {
-    type: "stdio",
-    command: "npx",
-    args: ["-y", "accessai-mcp"],
-    env: {
-      ACCESSAI_API_KEY: "ak_live_your_key_here",
-    },
-  },
-});
-
-const tools = await mcpClient.tools();
-
-const { text } = await generateText({
-  model: anthropic("claude-sonnet-4-20250514"),
-  tools,
-  prompt: "Scan https://example.com for accessibility issues and summarize the results",
-});
-```
-
-### OpenAI Agents SDK (Python)
-
-```python
-from agents import Agent
-from agents.mcp import MCPServerStdio
-
-mcp = MCPServerStdio(
-    command="npx",
-    args=["-y", "accessai-mcp"],
-    env={
-        "ACCESSAI_API_KEY": "ak_live_your_key_here",
-    },
-)
-
-agent = Agent(
-    name="Accessibility Checker",
-    instructions="You help developers fix web accessibility issues.",
-    mcp_servers=[mcp],
-)
-
-# The agent can now use scan_url, get_scan_history, get_scan_report, chat_about_scan
-```
-
-### Google ADK (Python)
-
-```python
-from google.adk.tools.mcp_tool import MCPToolset, StdioServerParameters
-
-tools, exit_stack = await MCPToolset.from_server(
-    connection_params=StdioServerParameters(
-        command="npx",
-        args=["-y", "accessai-mcp"],
-        env={
-            "ACCESSAI_API_KEY": "ak_live_your_key_here",
-        },
-    )
-)
-
-# Use tools with your Google ADK agent
-```
-
-## API Key Security
-
-- **API keys are hashed** — only SHA-256 hashes are stored in the database, never the raw key
-- **Revocable** — delete a key anytime from the dashboard without affecting your account
-- **Scoped** — API keys can only access API endpoints, not your dashboard or account settings
-- **Auditable** — each key tracks when it was last used
-
-## How it Works
-
-```
-Your IDE (Cursor/Cline/Claude Code)
-        ↕ stdio (MCP protocol)
-AccessAI MCP Server (runs locally)
-        ↕ HTTPS (with API key)
-AccessAI Backend (deployed on Render)
-        ↕
-AI Agent (Gemini) + Supabase (database)
-```
+## Source files read to write this
+`src/index.ts`, `src/api-client.ts`, `src/config.ts`, `src/auth.ts`, `src/client.ts`, `src/tools/scan-url.ts`, `src/tools/get-scan-history.ts`.

@@ -1,110 +1,73 @@
-# AccessAI Browser Extension
+# Browser Extension (`extension/`)
 
-A Chrome extension (Manifest V3) that lets authenticated AccessAI users scan any website for WCAG 2.1 accessibility issues directly from the browser toolbar.
+Chrome Manifest V3 extension. React 19 + Vite + Tailwind, popup UI.
 
-## Features
+## Purpose
 
-- **Sign in** with your AccessAI account (email + password)
-- **Scan current tab** with one click — auto-detects the active tab URL
-- **Scan any URL** by typing or pasting it into the input
-- **View inline report** — score, issue count by severity, collapsible issue cards with descriptions and recommendations
-- **Open full report** on the AccessAI website for AI chat, scan history, and more
+A one-click accessibility scanner living in the browser toolbar. The popup authenticates the user against Supabase, scans the current tab's URL via the AccessAI backend, and renders the resulting report (score, summary, issues) inline. It reuses the same backend API as the web app.
 
-## Getting Started
+## Boundaries
 
-### 1. Install dependencies
+- It does **not** run axe-core or any analysis locally — it POSTs the URL to the backend and displays the response.
+- It does **not** inject content scripts or modify visited pages (only `activeTab` + `storage` permissions); it reads the active tab's URL only.
+- It does **not** implement its own auth — session/token refresh is delegated to `@supabase/supabase-js` backed by `chrome.storage.local`.
+- The background service worker does **no** business logic (see `background/service-worker.ts`).
 
-```bash
-cd extension
-npm install
-```
+## Public surface
 
-### 2. Configure environment variables
+This is an app, not a library — its "surface" is the popup UI and its API helpers.
 
-```bash
-cp .env.example .env
-```
+### UI (`src/popup/`)
+- `App.tsx` — root component; a `ViewState` state machine: `loading → login | scan → progress → report`.
+- Screens (`src/popup/screens/`): `LoginScreen`, `ScanScreen`, `ProgressScreen`, `ReportScreen`.
+- Components (`src/popup/components/`): `IssueCard`, `Logo`.
 
-Fill in `.env` with your project values:
+### Lib (`src/lib/`)
+- `api.ts`: `createScan(url)` → `POST /api/scans`; `fetchScan(scanId)` → `GET /api/scans/:id`. Both go through `apiFetch` which injects the Bearer token.
+- `supabase.ts`: `supabase` client (with a `chrome.storage.local` storage adapter) and `getAccessToken()`.
 
-```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_BACKEND_URL=https://your-backend.onrender.com
-VITE_FRONTEND_URL=https://access-ai-frontend-sepia.vercel.app
-```
+### Background (`src/background/service-worker.ts`)
+- `chrome.runtime.onInstalled` listener that logs on install. Nothing else.
 
-### 3. Build the extension
+### Types (`src/types/index.ts`)
+- `ScanResult`, `ApiResponse<T>`, issue/scan types shared across the popup.
 
-```bash
-# Watch mode (development)
-npm run dev
+## Dependencies
 
-# Production build
-npm run build
-```
+- **Internal (this repo):** depends on the **backend** HTTP API and on **Supabase** (auth). Nothing depends on it.
+- **External:** `react`, `react-dom`, `@supabase/supabase-js`, Vite, Tailwind.
+- **Config (build-time `import.meta.env`):** `VITE_BACKEND_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+- **`manifest.json` `host_permissions`** hardcode the production backend and Supabase project origins — these cross to external services and must match the configured env.
 
-### 4. Load in Chrome
+## Key flows
 
-1. Open `chrome://extensions`
-2. Enable **Developer mode** (top right toggle)
-3. Click **Load unpacked**
-4. Select the `extension/dist` folder
+### 1. Auth bootstrap (`App.tsx`)
+1. On mount, `supabase.auth.getSession()` resolves from `chrome.storage.local`; view becomes `scan` if a session exists, else `login`.
+2. `onAuthStateChange` keeps `session` in sync and forces `login` on sign-out.
 
-### 5. Add icons
+### 2. Scan the current tab
+1. `ScanScreen` reads the active tab URL (via `activeTab`) and calls `onStartScan(url)`.
+2. `App.handleStartScan` switches to `progress`, calls `createScan(url)`.
+3. `apiFetch` fetches a token via `getAccessToken()` (throws "Not authenticated" if none), sets the Bearer header, POSTs to `/api/scans`.
+4. On success the view becomes `report` with the `ScanResult`; on error it returns to `scan` with the error message.
 
-Place PNG icons in `extension/public/icons/`:
-- `icon-16.png` — 16×16px
-- `icon-48.png` — 48×48px
-- `icon-128.png` — 128×128px
+### 3. Session persistence
+1. The Supabase client uses `chromeStorageAdapter` (`getItem`/`setItem`/`removeItem` over `chrome.storage.local`) so the session survives popup close/reopen; `autoRefreshToken` and `persistSession` are on, `detectSessionInUrl` off.
 
-Export these from `frontend/public/icon.svg` or create your own.
+## Rules and constraints
 
-## Backend Configuration
+- **Every backend call must attach a fresh Supabase access token; no token ⇒ throw before fetching.** Reason: the backend rejects unauthenticated reads, and failing fast gives a clearer UX than a 401.
+- **Session storage must use the `chrome.storage.local` adapter, not `localStorage`.** Reason: MV3 popups are ephemeral and `localStorage` is not reliably shared/persisted across popup lifecycles.
+- **Keep the service worker logic-free.** Reason: MV3 workers are killed aggressively; persistence lives in the Supabase client instead, so the worker holds no critical state.
+- **Only request `activeTab` + `storage`; never broaden host permissions beyond the backend + Supabase origins.** Reason: minimizes review friction and the extension's attack surface.
+- **All secrets are anon/public keys only.** Reason: no service-role or privileged credentials may ship in a client bundle.
 
-After loading the extension, note your extension ID from `chrome://extensions`.
-Then set it in your backend `.env`:
+## Gotchas
 
-```env
-# Development: allow all extension origins
-EXTENSION_ORIGIN=chrome-extension://*
+- **`ProgressScreen` is time/spinner-based, not event-based** — the extension uses the blocking `POST /api/scans` (not the SSE stream the web app uses), so progress is indicative only and a slow scan can look stuck.
+- **Hardcoded origins in `manifest.json`** (`access-ai-backend.onrender.com`, a specific Supabase project) — pointing the build at a different backend requires editing the manifest, not just env.
+- **A packaged `accessai-extension-v1.0.0.zip` is committed** at the module root; it can drift from source. TODO: verify it's a build artifact and not the source of truth.
+- **`VITE_*` values are inlined at build time**, so changing environments requires a rebuild, not a runtime config change.
 
-# Production: lock to your specific extension ID
-EXTENSION_ORIGIN=chrome-extension://your-extension-id
-```
-
-## Project Structure
-
-```
-extension/
-├── manifest.json           # Chrome MV3 manifest
-├── vite.config.ts          # Vite + @crxjs build config
-├── src/
-│   ├── types/index.ts      # Shared data types
-│   ├── lib/
-│   │   ├── supabase.ts     # Supabase client (chrome.storage adapter)
-│   │   └── api.ts          # Backend API wrapper with retry logic
-│   ├── background/
-│   │   └── service-worker.ts
-│   └── popup/
-│       ├── App.tsx         # Root component + state machine
-│       ├── screens/
-│       │   ├── LoginScreen.tsx
-│       │   ├── ScanScreen.tsx
-│       │   ├── ProgressScreen.tsx
-│       │   └── ReportScreen.tsx
-│       └── components/
-│           ├── ScoreBadge.tsx
-│           ├── SeverityBadge.tsx
-│           └── IssueCard.tsx
-```
-
-## What's NOT in the Extension
-
-These features require the full AccessAI website:
-- Create an account (sign up)
-- Reset password
-- View full scan history
-- Chat with the AI agent about specific issues
-
-All screens link directly to the website for these actions.
+## Source files read to write this
+`manifest.json`, `src/popup/App.tsx`, `src/lib/api.ts`, `src/lib/supabase.ts`, `src/background/service-worker.ts`, `src/popup/screens/` (listing), `package.json`.
